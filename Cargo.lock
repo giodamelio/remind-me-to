@@ -1605,6 +1605,7 @@ name = "remind-me-to-lib"
 version = "0.1.0"
 dependencies = [
  "chumsky",
+ "http",
  "httpmock",
  "ignore",
  "insta",

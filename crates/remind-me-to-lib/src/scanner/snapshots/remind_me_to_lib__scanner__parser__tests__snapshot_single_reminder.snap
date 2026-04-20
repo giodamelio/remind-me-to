@@ -1,0 +1,33 @@
+---
+source: crates/remind-me-to-lib/src/scanner/parser.rs
+expression: result.reminders
+---
+[
+    Reminder {
+        file: "src/tls.rs",
+        line: 1,
+        description: "Remove custom TLS config when the fix lands",
+        operations: [
+            PrMerged(
+                IssueRef {
+                    forge_ref: ForgeRef {
+                        forge: "github",
+                        owner: "hyper-rs",
+                        repo: "hyper",
+                    },
+                    number: 3210,
+                },
+            ),
+            TagExists(
+                RefRef {
+                    forge_ref: ForgeRef {
+                        forge: "github",
+                        owner: "hyper-rs",
+                        repo: "hyper",
+                    },
+                    value: ">=1.5.0",
+                },
+            ),
+        ],
+    },
+]

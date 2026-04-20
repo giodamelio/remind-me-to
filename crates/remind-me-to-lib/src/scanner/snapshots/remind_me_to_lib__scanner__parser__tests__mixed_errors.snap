@@ -1,0 +1,20 @@
+---
+source: crates/remind-me-to-lib/src/scanner/parser.rs
+expression: "&result.errors"
+---
+[
+    Parse {
+        file: "src/mixed.rs",
+        line: 1,
+        col: 0,
+        message: "expected forge prefix (e.g., 'github:') in 'bad'",
+        span: 0..13,
+        source_line: "// REMIND-ME-TO: fix pr_merged=bad tag_exists=github:a/b@>=1.0 issue_closed=github:c/d#5",
+        expected: [
+            "valid value for pr_merged",
+        ],
+        found: Some(
+            "bad",
+        ),
+    },
+]

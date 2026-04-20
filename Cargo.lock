@@ -1595,6 +1595,7 @@ dependencies = [
  "miette",
  "predicates",
  "remind-me-to-lib",
+ "serde_json",
  "tempfile",
  "tracing",
  "tracing-subscriber",

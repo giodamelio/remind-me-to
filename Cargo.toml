@@ -1,6 +1,3 @@
-[package]
-name = "remind-me-to"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
+[workspace]
+members = ["crates/remind-me-to-lib", "crates/remind-me-to-cli"]
+resolver = "3"

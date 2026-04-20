@@ -164,20 +164,17 @@ pub fn resolve_shorthand(shorthand: &str, context: &Option<GitContext>) -> Optio
     let context = context.as_ref()?;
 
     if let Some(number) = shorthand.strip_prefix('#') {
-        // Issue-like shorthand: #123
         Some(format!(
             "{}:{}/{}#{}",
             context.forge, context.owner, context.repo, number
         ))
-    } else if shorthand.starts_with('@') {
-        // Ref-like shorthand: @>=1.0.0
-        let value = &shorthand[1..];
-        Some(format!(
-            "{}:{}/{}@{}",
-            context.forge, context.owner, context.repo, value
-        ))
     } else {
-        None
+        shorthand.strip_prefix('@').map(|value| {
+            format!(
+                "{}:{}/{}@{}",
+                context.forge, context.owner, context.repo, value
+            )
+        })
     }
 }
 

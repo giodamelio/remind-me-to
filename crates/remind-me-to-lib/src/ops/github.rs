@@ -106,9 +106,9 @@ impl GitHubClient {
 
     /// Check rate limit headers on a response and log warnings.
     fn check_rate_limit_headers(&self, response: &Response<Body>) {
-        if let Some(remaining) = response.headers().get("X-RateLimit-Remaining") {
-            if let Ok(remaining_str) = remaining.to_str() {
-                if let Ok(n) = remaining_str.parse::<u64>() {
+        if let Some(remaining) = response.headers().get("X-RateLimit-Remaining")
+            && let Ok(remaining_str) = remaining.to_str()
+                && let Ok(n) = remaining_str.parse::<u64>() {
                     if n == 0 {
                         let reset = response
                             .headers()
@@ -123,8 +123,6 @@ impl GitHubClient {
                         tracing::debug!("GitHub rate limit remaining: {}", n);
                     }
                 }
-            }
-        }
     }
 
     /// Fetch all tags with pagination.
@@ -319,6 +317,12 @@ pub mod mock {
         pub branch_responses: HashMap<(String, String, String), Result<bool, CheckError>>,
         pub release_responses: HashMap<(String, String), Result<Vec<Release>, CheckError>>,
         call_counts: RwLock<HashMap<String, AtomicUsize>>,
+    }
+
+    impl Default for MockForgeClient {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl MockForgeClient {

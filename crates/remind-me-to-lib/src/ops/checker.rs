@@ -65,11 +65,10 @@ pub fn check_all(
 
             // Collect errors
             for r in &results {
-                if r.status == OperationStatus::Error {
-                    if let Some(ref detail) = r.detail {
+                if r.status == OperationStatus::Error
+                    && let Some(ref detail) = r.detail {
                         errors.push(detail.clone());
                     }
-                }
             }
 
             CheckedReminder {

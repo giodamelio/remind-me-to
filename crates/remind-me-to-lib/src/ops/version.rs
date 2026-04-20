@@ -154,17 +154,15 @@ fn warn_if_non_semver_caret_tilde(constraint: &str, req: &Requirement) {
     let trimmed = constraint.trim();
     let uses_caret_or_tilde = trimmed.starts_with('^') || trimmed.starts_with('~');
 
-    if uses_caret_or_tilde {
-        if let Some(ref ver) = req.version {
-            if !matches!(ver, Versioning::Ideal(_)) {
+    if uses_caret_or_tilde
+        && let Some(ref ver) = req.version
+            && !matches!(ver, Versioning::Ideal(_)) {
                 tracing::warn!(
                     "constraint '{}' uses ^/~ but version doesn't look like semver. \
                      Consider using >= instead.",
                     constraint
                 );
             }
-        }
-    }
 }
 
 #[cfg(test)]

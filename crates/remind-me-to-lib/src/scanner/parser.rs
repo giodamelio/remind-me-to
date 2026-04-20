@@ -180,7 +180,7 @@ fn parse_forge_ref_prefix(value: &str) -> Result<(ForgeRef, &str), String> {
 
     // The repo name ends at '#' or '@' (the sigil)
     let repo_end = rest
-        .find(|c: char| c == '#' || c == '@')
+        .find(['#', '@'])
         .unwrap_or(rest.len());
 
     let repo = &rest[..repo_end];
@@ -229,7 +229,7 @@ fn parse_date(value: &str) -> Result<String, String> {
         .parse()
         .map_err(|_| format!("invalid day in '{value}'"))?;
 
-    if year < 1970 || year > 2100 {
+    if !(1970..=2100).contains(&year) {
         return Err(format!("year out of range in '{value}'"));
     }
     if !(1..=12).contains(&month) {

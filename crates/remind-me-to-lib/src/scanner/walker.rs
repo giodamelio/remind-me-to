@@ -53,11 +53,10 @@ pub fn walk_paths(
         let err_tx = err_tx.clone();
         Box::new(move |result| match result {
             Ok(entry) => {
-                if entry.file_type().is_some_and(|ft| ft.is_file()) {
-                    if !is_binary(entry.path()) {
+                if entry.file_type().is_some_and(|ft| ft.is_file())
+                    && !is_binary(entry.path()) {
                         let _ = tx.send(entry);
                     }
-                }
                 WalkState::Continue
             }
             Err(err) => {

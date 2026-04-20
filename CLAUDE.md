@@ -40,43 +40,78 @@ cargo nextest run -p <crate> -E 'test(=exact_name)' # single test
 # Snapshot testing
 cargo insta test --test-runner nextest --workspace
 cargo insta review
+
+# Run the CLI
+cargo run -p remind-me-to-cli -- check --dry-run .
+cargo run -p remind-me-to-cli -- check --help
 ```
 
 ## Project Overview
 
-`remind-me-to` is a CLI tool that scans source files for `REMIND-ME-TO:` comments containing machine-checkable conditions (e.g., "remove this workaround when upstream PR merges"). It queries external APIs (GitHub, Gitea, Forgejo) to check if conditions are met, then reports which reminders need attention.
+`remind-me-to` is a CLI tool that scans source files for `REMIND-ME-TO:` comments containing machine-checkable conditions (e.g., "remove this workaround when upstream PR merges"). It queries external APIs (GitHub) to check if conditions are met, then reports which reminders need attention.
 
-## Architecture (Planned Workspace Layout)
+## Architecture (Implemented Workspace Layout)
 
 ```
 crates/
-  remind-me-to-lib/    # Core library
+  remind-me-to-lib/    # Core library (pure business logic, no config)
     src/
-      scanner/         # File walking (ignore crate) + comment parsing (chumsky)
-      ops/             # Operation checkers (pr_merged, tag_exists, etc.)
-      output/          # Formatters (text, JSON, LLM prompt)
-      errors.rs        # Error types (thiserror + miette)
-  remind-me-to-cli/    # Binary crate (clap + config)
+      lib.rs           # Re-exports modules
+      errors.rs        # ScanError, CheckError, FatalError (thiserror)
+      scanner/
+        mod.rs         # scan() top-level function
+        parser.rs      # REMIND-ME-TO marker detection + operation parsing
+        walker.rs      # Parallel file walking (ignore crate)
+        git_context.rs # Git remote detection, shorthand resolution
+      ops/
+        mod.rs
+        types.rs       # Operation enum, ForgeClient trait, Reminder, CheckResult types
+        github.rs      # GitHubClient (ureq) + MockForgeClient for testing
+        version.rs     # Version constraint checking (versions crate)
+        checker.rs     # check_all() orchestration, deduplication, parallel checking
+      output/
+        mod.rs
+        text.rs        # Human-readable text formatter
+        json.rs        # JSON output formatter
+        llm.rs         # LLM-friendly prompt formatter
+  remind-me-to-cli/    # Binary crate (thin CLI wrapper)
+    src/
+      main.rs          # clap args, tracing init, config, calls lib functions
 ```
 
 ## Key Design Decisions
 
-- **Parser:** `chumsky` for comment parsing with error recovery
+- **Parser:** Hand-rolled with line scanning + structured value parsing (chumsky alpha was too unstable for MVP)
 - **File walking:** `ignore` crate (respects .gitignore, parallel walking)
-- **HTTP:** `ureq` (blocking, simple) with `httpmock` for tests
-- **Version comparison:** `versions` crate (handles semver, calver, 4-segment)
-- **Error handling:** `thiserror` for types, `miette` for CLI rendering
-- **CLI:** `clap` derive, `config` crate for TOML config files
-- **Logging:** `tracing` with Compact formatter
-- **CLI testing:** `assert_cmd` + `insta-cmd` for snapshot testing
+- **HTTP:** `ureq` 3.x (blocking, sync) with `http` crate types
+- **Version comparison:** `versions` crate with manual fallback for CalVer/4-segment
+- **Error handling:** `thiserror` for structured error types
+- **CLI:** `clap` derive with subcommands
+- **Logging:** `tracing` + `tracing-subscriber` with Compact formatter
+- **Testing:** `cargo-insta` snapshots, `tempfile` for test fixtures, `MockForgeClient` for unit tests
+- **Lib crate is config-free:** All config loading lives in the CLI crate; the lib accepts pre-resolved values
 
-## Implementation Plan
+## 8 MVP Operations
 
-See `docs/IMPLEMENTATION_PLAN.md` for the phased build plan. See `docs/REQUIREMENTS.md` for full specification. Research findings are in `docs/research/`.
+| Operation | Triggers when |
+|-----------|---------------|
+| `pr_merged` | PR is merged |
+| `pr_closed` | PR is closed (merged or not) |
+| `tag_exists` | Version constraint satisfied by a tag |
+| `commit_released` | Commit SHA in a release |
+| `pr_released` | PR's merge commit in a release |
+| `issue_closed` | Issue is closed |
+| `branch_deleted` | Branch no longer exists |
+| `date_passed` | Specified date has passed |
 
 ## Testing Conventions
 
 - Use `cargo-insta` snapshot tests for parser output and error messages
-- Use `httpmock` for HTTP integration tests (not real network calls)
-- Use `assert_cmd` + `insta-cmd` for CLI binary tests
+- Use `MockForgeClient` (in `ops::github::mock`) for operation checking tests
+- Use `tempfile` for test fixtures with directory trees
 - Test error recovery paths — one bad file shouldn't halt the scan
+- Always use `cargo nextest run`, never `cargo test`
+
+## Implementation Plan
+
+See `docs/IMPLEMENTATION_PLAN.md` for the phased build plan. See `docs/REQUIREMENTS.md` for full specification. Research findings are in `docs/research/`.

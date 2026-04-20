@@ -1,3 +1,4 @@
+pub mod git_context;
 pub mod parser;
 pub mod walker;
 

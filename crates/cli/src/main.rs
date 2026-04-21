@@ -21,7 +21,11 @@ struct Cli {
     color: ColorMode,
 
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+
+    /// Arguments for the default check command (when no subcommand is given)
+    #[command(flatten)]
+    check_args: CheckArgs,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -34,39 +38,42 @@ enum ColorMode {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Scan files for REMIND-ME-TO comments and check their conditions
-    Check {
-        /// Paths to scan (defaults to current directory)
-        #[arg(default_value = ".")]
-        paths: Vec<PathBuf>,
+    Check(CheckArgs),
+}
 
-        /// Output format
-        #[arg(long, default_value = "text")]
-        format: OutputFormat,
+#[derive(clap::Args, Debug)]
+struct CheckArgs {
+    /// Paths to scan (defaults to current directory)
+    #[arg(default_value = ".")]
+    paths: Vec<PathBuf>,
 
-        /// Additional ignore patterns
-        #[arg(long = "ignore")]
-        ignore_patterns: Vec<String>,
+    /// Output format
+    #[arg(long, default_value = "text")]
+    format: OutputFormat,
 
-        /// Don't respect .gitignore/.ignore files
-        #[arg(long)]
-        no_gitignore: bool,
+    /// Additional ignore patterns
+    #[arg(long = "ignore")]
+    ignore_patterns: Vec<String>,
 
-        /// Find and parse comments without checking external services
-        #[arg(long)]
-        dry_run: bool,
+    /// Don't respect .gitignore/.ignore files
+    #[arg(long)]
+    no_gitignore: bool,
 
-        /// Increase verbosity (-v debug, -vv trace, -vvv trace with targets)
-        #[arg(short, long, action = clap::ArgAction::Count)]
-        verbose: u8,
+    /// Find and parse comments without checking external services
+    #[arg(long)]
+    dry_run: bool,
 
-        /// Suppress all output, only set exit code
-        #[arg(short, long)]
-        quiet: bool,
+    /// Increase verbosity (-v debug, -vv trace, -vvv trace with targets)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
 
-        /// Log level: error, warn, info, debug, trace
-        #[arg(long)]
-        log_level: Option<String>,
-    },
+    /// Suppress all output, only set exit code
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Log level: error, warn, info, debug, trace
+    #[arg(long)]
+    log_level: Option<String>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -205,112 +212,112 @@ fn run() -> Result<ExitCode, FatalError> {
 
     let use_ansi = configure_color(&cli.color);
 
-    match cli.command {
-        Commands::Check {
-            paths,
-            format,
-            ignore_patterns,
-            no_gitignore,
-            dry_run,
-            verbose,
-            quiet,
-            log_level,
-        } => {
-            init_tracing(verbose, quiet, &log_level, use_ansi);
+    let CheckArgs {
+        paths,
+        format,
+        ignore_patterns,
+        no_gitignore,
+        dry_run,
+        verbose,
+        quiet,
+        log_level,
+    } = match cli.command {
+        Some(Commands::Check(args)) => args,
+        None => cli.check_args,
+    };
 
-            let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
+    init_tracing(verbose, quiet, &log_level, use_ansi);
 
-            if path_refs.is_empty() {
-                return Err(FatalError::NoInput);
-            }
+    let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
 
-            // Scan for reminders
-            let scan_result =
-                remind_lib::scanner::scan(&path_refs, !no_gitignore, &ignore_patterns);
+    if path_refs.is_empty() {
+        return Err(FatalError::NoInput);
+    }
 
-            // Report parse errors
-            if !quiet {
-                for error in &scan_result.errors {
-                    eprintln!("{} {error}", "error:".red().bold());
+    // Scan for reminders
+    let scan_result = remind_lib::scanner::scan(&path_refs, !no_gitignore, &ignore_patterns);
+
+    // Report parse errors
+    if !quiet {
+        for error in &scan_result.errors {
+            eprintln!("{} {error}", "error:".red().bold());
+        }
+    }
+
+    if dry_run {
+        if !quiet {
+            match format {
+                OutputFormat::Json => {
+                    let json = serde_json::json!({
+                        "reminders": scan_result.reminders,
+                        "errors": scan_result.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
+                    });
+                    println!("{}", serde_json::to_string_pretty(&json).unwrap());
                 }
-            }
-
-            if dry_run {
-                if !quiet {
-                    match format {
-                        OutputFormat::Json => {
-                            let json = serde_json::json!({
-                                "reminders": scan_result.reminders,
-                                "errors": scan_result.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                            });
-                            println!("{}", serde_json::to_string_pretty(&json).unwrap());
-                        }
-                        OutputFormat::Text | OutputFormat::Llm => {
-                            if scan_result.reminders.is_empty() {
-                                println!("No REMIND-ME-TO comments found.");
-                            } else {
-                                println!(
-                                    "Found {} (dry run, no conditions checked):\n",
-                                    format!("{} reminder(s)", scan_result.reminders.len()).bold()
-                                );
-                                for reminder in &scan_result.reminders {
-                                    println!(
-                                        "{}{}{} {}",
-                                        reminder.file.display().to_string().cyan(),
-                                        ":".dimmed(),
-                                        reminder.line,
-                                        reminder.description
-                                    );
-                                    for op in &reminder.operations {
-                                        println!("  {}", format!("{op}").dimmed());
-                                    }
-                                    println!();
-                                }
+                OutputFormat::Text | OutputFormat::Llm => {
+                    if scan_result.reminders.is_empty() {
+                        println!("No REMIND-ME-TO comments found.");
+                    } else {
+                        println!(
+                            "Found {} (dry run, no conditions checked):\n",
+                            format!("{} reminder(s)", scan_result.reminders.len()).bold()
+                        );
+                        for reminder in &scan_result.reminders {
+                            println!(
+                                "{}{}{} {}",
+                                reminder.file.display().to_string().cyan(),
+                                ":".dimmed(),
+                                reminder.line,
+                                reminder.description
+                            );
+                            for op in &reminder.operations {
+                                println!("  {}", format!("{op}").dimmed());
                             }
+                            println!();
                         }
                     }
                 }
-
-                let exit = if !scan_result.errors.is_empty() {
-                    ExitCode::from(2)
-                } else {
-                    ExitCode::SUCCESS
-                };
-                return Ok(exit);
-            }
-
-            // Full check mode
-            let token = resolve_github_token();
-            let client: Box<dyn ForgeClient> = Box::new(GitHubClient::new(token));
-
-            let check_result =
-                remind_lib::ops::checker::check_all(&scan_result.reminders, client.as_ref(), 8);
-
-            if !quiet {
-                match format {
-                    OutputFormat::Text => {
-                        remind_lib::output::text::format_text(&check_result, verbose);
-                    }
-                    OutputFormat::Json => {
-                        remind_lib::output::json::format_json(&check_result);
-                    }
-                    OutputFormat::Llm => {
-                        remind_lib::output::llm::format_llm(&check_result);
-                    }
-                }
-            }
-
-            let has_triggered = check_result.reminders.iter().any(|r| r.triggered);
-            let has_errors = !scan_result.errors.is_empty() || !check_result.errors.is_empty();
-
-            if has_errors {
-                Ok(ExitCode::from(2))
-            } else if has_triggered {
-                Ok(ExitCode::from(1))
-            } else {
-                Ok(ExitCode::SUCCESS)
             }
         }
+
+        let exit = if !scan_result.errors.is_empty() {
+            ExitCode::from(2)
+        } else {
+            ExitCode::SUCCESS
+        };
+        return Ok(exit);
+    }
+
+    // Full check mode
+    let token = resolve_github_token();
+    let client: Box<dyn ForgeClient> = Box::new(GitHubClient::new(token));
+
+    let check_result =
+        remind_lib::ops::checker::check_all(&scan_result.reminders, client.as_ref(), 8);
+
+    if !quiet {
+        match format {
+            OutputFormat::Text => {
+                remind_lib::output::text::format_text(&check_result, verbose);
+            }
+            OutputFormat::Json => {
+                remind_lib::output::json::format_json(&check_result);
+            }
+            OutputFormat::Llm => {
+                remind_lib::output::llm::format_llm(&check_result);
+            }
+        }
+    }
+
+    let has_triggered = check_result.reminders.iter().any(|r| r.triggered);
+    let has_errors = !scan_result.errors.is_empty() || !check_result.errors.is_empty();
+
+    if has_errors {
+        Ok(ExitCode::from(2))
+    } else if has_triggered {
+        Ok(ExitCode::from(1))
+    } else {
+        Ok(ExitCode::SUCCESS)
     }
 }
 

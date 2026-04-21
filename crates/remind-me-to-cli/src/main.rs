@@ -198,7 +198,7 @@ fn run() -> Result<ExitCode, FatalError> {
                                         "{}{}{} {}",
                                         reminder.file.display().to_string().cyan(),
                                         ":".dimmed(),
-                                        reminder.line.to_string().yellow(),
+                                        reminder.line,
                                         reminder.description
                                     );
                                     for op in &reminder.operations {

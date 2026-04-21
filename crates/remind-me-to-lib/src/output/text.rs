@@ -43,7 +43,7 @@ fn print_reminder(reminder: &CheckedReminder) {
         "{}{}{} {}",
         reminder.reminder.file.display().to_string().cyan(),
         ":".dimmed(),
-        reminder.reminder.line.to_string().yellow(),
+        reminder.reminder.line,
         reminder.reminder.description,
     );
     for op_result in &reminder.results {

@@ -54,7 +54,7 @@ cargo run -p remind-me-to-cli -- check --help
 
 ```
 crates/
-  remind-me-to-lib/    # Core library (pure business logic, no config)
+  lib/                 # Core library (pure business logic, no config)
     src/
       lib.rs           # Re-exports modules
       errors.rs        # ScanError, CheckError, FatalError (thiserror)
@@ -74,14 +74,14 @@ crates/
         text.rs        # Human-readable text formatter
         json.rs        # JSON output formatter
         llm.rs         # LLM-friendly prompt formatter
-  remind-me-to-cli/    # Binary crate (thin CLI wrapper)
+  cli/                 # Binary crate (thin CLI wrapper)
     src/
       main.rs          # clap args, tracing init, config, calls lib functions
 ```
 
 ## Key Design Decisions
 
-- **Parser:** Hand-rolled with line scanning + structured value parsing (chumsky alpha was too unstable for MVP)
+- **Parser:** Line scanner + chumsky parser combinators for post-marker content
 - **File walking:** `ignore` crate (respects .gitignore, parallel walking)
 - **HTTP:** `ureq` 3.x (blocking, sync) with `http` crate types
 - **Version comparison:** `versions` crate with manual fallback for CalVer/4-segment

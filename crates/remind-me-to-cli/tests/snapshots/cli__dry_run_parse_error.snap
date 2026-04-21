@@ -1,0 +1,23 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmp0riclI
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: false
+exit_code: 2
+----- stdout -----
+No REMIND-ME-TO comments found.
+
+----- stderr -----
+error: parse error in [DIR]/bad.rs:1: expected forge prefix (e.g. 'github:') in 'invalid_value'

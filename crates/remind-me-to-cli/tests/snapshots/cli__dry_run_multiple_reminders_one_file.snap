@@ -1,0 +1,29 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmpi0wLTn/multi.rs
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Found 2 reminder(s) (dry run, no conditions checked):
+
+[DIR]/multi.rs:1 Fix A
+  pr_merged=github:owner/repo#1
+
+[DIR]/multi.rs:3 Fix B
+  tag_exists=github:owner/repo@>=2.0.0
+
+
+----- stderr -----

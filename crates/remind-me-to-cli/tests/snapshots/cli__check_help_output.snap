@@ -1,0 +1,37 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--help"
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Scan files for REMIND-ME-TO comments and check their conditions
+
+Usage: remind-me-to check [OPTIONS] [PATHS]...
+
+Arguments:
+  [PATHS]...  Paths to scan (defaults to current directory) [default: .]
+
+Options:
+      --color <COLOR>             When to use colors: auto (default, detect tty), always, never. Respects NO_COLOR env var [default: auto] [possible values: auto, always, never]
+      --format <FORMAT>           Output format [default: text] [possible values: text, json, llm]
+      --ignore <IGNORE_PATTERNS>  Additional ignore patterns
+      --no-gitignore              Don't respect .gitignore/.ignore files
+      --dry-run                   Find and parse comments without checking external services
+  -v, --verbose...                Increase verbosity (-v debug, -vv trace, -vvv trace with targets)
+  -q, --quiet                     Suppress all output, only set exit code
+      --log-level <LOG_LEVEL>     Log level: error, warn, info, debug, trace
+  -h, --help                      Print help
+
+----- stderr -----

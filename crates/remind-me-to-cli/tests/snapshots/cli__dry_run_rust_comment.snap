@@ -1,0 +1,26 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmpgEm73v/test.rs
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Found 1 reminder(s) (dry run, no conditions checked):
+
+[DIR]/test.rs:1 rust
+  pr_merged=github:a/b#1
+
+
+----- stderr -----

@@ -1,0 +1,27 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmpKT2qr3
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: false
+exit_code: 2
+----- stdout -----
+Found 1 reminder(s) (dry run, no conditions checked):
+
+[DIR]/mixed.rs:1 fix
+  tag_exists=github:a/b@>=1.0
+
+
+----- stderr -----
+error: parse error in [DIR]/mixed.rs:1: expected forge prefix (e.g. 'github:') in 'bad'

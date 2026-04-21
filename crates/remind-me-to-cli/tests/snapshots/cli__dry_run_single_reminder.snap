@@ -1,0 +1,26 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmpmKEQe1
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Found 1 reminder(s) (dry run, no conditions checked):
+
+[DIR]/main.rs:1 Remove workaround
+  pr_merged=github:tokio-rs/tokio#5432
+
+
+----- stderr -----

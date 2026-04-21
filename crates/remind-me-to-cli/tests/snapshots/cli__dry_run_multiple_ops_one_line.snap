@@ -1,0 +1,27 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - /tmp/.tmpiBIUzC
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Found 1 reminder(s) (dry run, no conditions checked):
+
+[DIR]/multi.rs:1 Remove TLS hack
+  pr_merged=github:hyper/hyper#100
+  tag_exists=github:hyper/hyper@>=2.0
+
+
+----- stderr -----

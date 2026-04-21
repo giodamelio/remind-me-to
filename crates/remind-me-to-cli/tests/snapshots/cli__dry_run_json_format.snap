@@ -1,0 +1,45 @@
+---
+source: crates/remind-me-to-cli/tests/cli.rs
+info:
+  program: remind-me-to
+  args:
+    - "--color"
+    - never
+    - check
+    - "--dry-run"
+    - "--format"
+    - json
+    - /tmp/.tmpIz44mF
+  env:
+    GH_TOKEN: ""
+    GITHUB_TOKEN: ""
+    NO_COLOR: "1"
+    RUST_LOG: "off"
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "errors": [],
+  "reminders": [
+    {
+      "description": "Remove workaround",
+      "file": "[DIR]/main.rs",
+      "line": 1,
+      "operations": [
+        {
+          "PrMerged": {
+            "forge_ref": {
+              "forge": "github",
+              "owner": "tokio-rs",
+              "repo": "tokio"
+            },
+            "number": 5432
+          }
+        }
+      ]
+    }
+  ]
+}
+
+----- stderr -----

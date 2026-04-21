@@ -1604,6 +1604,7 @@ dependencies = [
  "insta-cmd",
  "miette",
  "predicates",
+ "regex",
  "remind-me-to-lib",
  "serde_json",
  "tempfile",

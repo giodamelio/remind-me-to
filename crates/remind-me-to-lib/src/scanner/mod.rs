@@ -51,6 +51,9 @@ pub fn scan(
         }
     }
 
+    // Sort by file path then line number for deterministic output.
+    all_reminders.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));
+
     tracing::debug!(
         reminders = all_reminders.len(),
         errors = errors.len(),

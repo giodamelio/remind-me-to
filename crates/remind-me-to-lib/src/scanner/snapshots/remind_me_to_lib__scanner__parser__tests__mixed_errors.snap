@@ -7,14 +7,12 @@ expression: "&result.errors"
         file: "src/mixed.rs",
         line: 1,
         col: 0,
-        message: "expected forge prefix (e.g., 'github:') in 'bad'",
-        span: 0..13,
+        message: "expected forge prefix (e.g. 'github:') in 'bad'",
+        span: 0..71,
         source_line: "// REMIND-ME-TO: fix pr_merged=bad tag_exists=github:a/b@>=1.0 issue_closed=github:c/d#5",
-        expected: [
-            "valid value for pr_merged",
-        ],
+        expected: [],
         found: Some(
-            "bad",
+            "expected forge prefix (e.g. 'github:') in 'bad'",
         ),
     },
 ]

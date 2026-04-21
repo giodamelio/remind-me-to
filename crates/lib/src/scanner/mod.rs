@@ -21,7 +21,11 @@ pub fn scan(
     );
 
     let (entries, mut errors) = walker::walk_paths(paths, respect_gitignore, extra_ignore_patterns);
-    tracing::debug!(files = entries.len(), walk_errors = errors.len(), "file walk complete");
+    tracing::debug!(
+        files = entries.len(),
+        walk_errors = errors.len(),
+        "file walk complete"
+    );
 
     let mut all_reminders: Vec<Reminder> = Vec::new();
 

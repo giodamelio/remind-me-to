@@ -4,7 +4,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use remind_lib::errors::FatalError;
 use remind_lib::ops::github::GitHubClient;
@@ -140,14 +140,15 @@ where
         }
 
         if self.show_targets
-            && let Some(target) = event.metadata().module_path() {
-                if self.use_ansi {
-                    use colored::Colorize;
-                    write!(writer, "{} ", target.dimmed())?;
-                } else {
-                    write!(writer, "{target} ")?;
-                }
+            && let Some(target) = event.metadata().module_path()
+        {
+            if self.use_ansi {
+                use colored::Colorize;
+                write!(writer, "{} ", target.dimmed())?;
+            } else {
+                write!(writer, "{target} ")?;
             }
+        }
 
         ctx.field_format().format_fields(writer.by_ref(), event)?;
         writeln!(writer)
@@ -168,8 +169,11 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
         }
     };
 
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(format!("remind_lib={default_directive},cli={default_directive}")));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new(format!(
+            "remind_lib={default_directive},cli={default_directive}"
+        ))
+    });
 
     let show_targets = verbosity >= 3;
 
@@ -178,7 +182,10 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
         .with_ansi(use_ansi)
         .with_target(show_targets)
         .with_span_events(fmt::format::FmtSpan::CLOSE)
-        .event_format(CustomFormatter { show_targets, use_ansi });
+        .event_format(CustomFormatter {
+            show_targets,
+            use_ansi,
+        });
 
     tracing_subscriber::registry()
         .with(env_filter)
@@ -211,19 +218,15 @@ fn run() -> Result<ExitCode, FatalError> {
         } => {
             init_tracing(verbose, quiet, &log_level, use_ansi);
 
-            let path_refs: Vec<&std::path::Path> =
-                paths.iter().map(|p| p.as_path()).collect();
+            let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
 
             if path_refs.is_empty() {
                 return Err(FatalError::NoInput);
             }
 
             // Scan for reminders
-            let scan_result = remind_lib::scanner::scan(
-                &path_refs,
-                !no_gitignore,
-                &ignore_patterns,
-            );
+            let scan_result =
+                remind_lib::scanner::scan(&path_refs, !no_gitignore, &ignore_patterns);
 
             // Report parse errors
             if !quiet {
@@ -248,8 +251,7 @@ fn run() -> Result<ExitCode, FatalError> {
                             } else {
                                 println!(
                                     "Found {} (dry run, no conditions checked):\n",
-                                    format!("{} reminder(s)", scan_result.reminders.len())
-                                        .bold()
+                                    format!("{} reminder(s)", scan_result.reminders.len()).bold()
                                 );
                                 for reminder in &scan_result.reminders {
                                     println!(
@@ -281,18 +283,13 @@ fn run() -> Result<ExitCode, FatalError> {
             let token = resolve_github_token();
             let client: Box<dyn ForgeClient> = Box::new(GitHubClient::new(token));
 
-            let check_result = remind_lib::ops::checker::check_all(
-                &scan_result.reminders,
-                client.as_ref(),
-                8,
-            );
+            let check_result =
+                remind_lib::ops::checker::check_all(&scan_result.reminders, client.as_ref(), 8);
 
             if !quiet {
                 match format {
                     OutputFormat::Text => {
-                        remind_lib::output::text::format_text(
-                            &check_result, verbose,
-                        );
+                        remind_lib::output::text::format_text(&check_result, verbose);
                     }
                     OutputFormat::Json => {
                         remind_lib::output::json::format_json(&check_result);
@@ -303,12 +300,8 @@ fn run() -> Result<ExitCode, FatalError> {
                 }
             }
 
-            let has_triggered = check_result
-                .reminders
-                .iter()
-                .any(|r| r.triggered);
-            let has_errors = !scan_result.errors.is_empty()
-                || !check_result.errors.is_empty();
+            let has_triggered = check_result.reminders.iter().any(|r| r.triggered);
+            let has_errors = !scan_result.errors.is_empty() || !check_result.errors.is_empty();
 
             if has_errors {
                 Ok(ExitCode::from(2))

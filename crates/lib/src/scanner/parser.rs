@@ -99,10 +99,7 @@ fn looks_like_comment(before: &str) -> bool {
     let trimmed = before.trim();
 
     // Line starts with a comment prefix – most common case.
-    if LINE_START_PREFIXES
-        .iter()
-        .any(|p| trimmed.starts_with(p))
-    {
+    if LINE_START_PREFIXES.iter().any(|p| trimmed.starts_with(p)) {
         return true;
     }
 
@@ -419,7 +416,10 @@ fn foo() {}
     fn parse_pr_closed() {
         let r = parse("// REMIND-ME-TO: cleanup pr_closed=github:owner/repo#99");
         assert_eq!(r.reminders[0].operations.len(), 1);
-        assert!(matches!(&r.reminders[0].operations[0], Operation::PrClosed(_)));
+        assert!(matches!(
+            &r.reminders[0].operations[0],
+            Operation::PrClosed(_)
+        ));
     }
 
     #[test]
@@ -448,7 +448,10 @@ fn foo() {}
     #[test]
     fn parse_pr_released() {
         let r = parse("// REMIND-ME-TO: update pr_released=github:foo/bar#42");
-        assert!(matches!(&r.reminders[0].operations[0], Operation::PrReleased(_)));
+        assert!(matches!(
+            &r.reminders[0].operations[0],
+            Operation::PrReleased(_)
+        ));
     }
 
     #[test]
@@ -524,8 +527,14 @@ fn foo() {}
             "// REMIND-ME-TO: Remove custom TLS config pr_merged=github:hyper-rs/hyper#3210 tag_exists=github:hyper-rs/hyper@>=1.5.0",
         );
         assert_eq!(r.reminders[0].operations.len(), 2);
-        assert!(matches!(&r.reminders[0].operations[0], Operation::PrMerged(_)));
-        assert!(matches!(&r.reminders[0].operations[1], Operation::TagExists(_)));
+        assert!(matches!(
+            &r.reminders[0].operations[0],
+            Operation::PrMerged(_)
+        ));
+        assert!(matches!(
+            &r.reminders[0].operations[1],
+            Operation::TagExists(_)
+        ));
     }
 
     // ---- Error handling ----
@@ -548,7 +557,10 @@ fn foo() {}
         assert_eq!(r.errors.len(), 1);
         assert_eq!(r.reminders.len(), 1);
         assert_eq!(r.reminders[0].operations.len(), 1);
-        assert!(matches!(&r.reminders[0].operations[0], Operation::TagExists(_)));
+        assert!(matches!(
+            &r.reminders[0].operations[0],
+            Operation::TagExists(_)
+        ));
     }
 
     // ---- Comment closers ----
@@ -581,7 +593,8 @@ fn foo() {}
 
     #[test]
     fn lua_comment() {
-        let r = parse("-- Remind-Me-To: Switch back to upstream pr_merged=github:neovim/neovim#28100");
+        let r =
+            parse("-- Remind-Me-To: Switch back to upstream pr_merged=github:neovim/neovim#28100");
         assert_eq!(r.reminders.len(), 1);
     }
 
@@ -644,7 +657,9 @@ fn foo() {}
     #[test]
     fn ignores_marker_in_multiline_string_continuation() {
         // Second line of a Rust string literal that happens to start with //
-        let r = parse(r#"                        // REMIND-ME-TO: not real issue_closed=github:c/d#2\n";"#);
+        let r = parse(
+            r#"                        // REMIND-ME-TO: not real issue_closed=github:c/d#2\n";"#,
+        );
         // The line starts with `//` so the scanner *will* pick it up,
         // but the value `github:c/d#2\n` contains `\n` which is not a valid
         // value char, so chumsky will NOT match it as an operation.

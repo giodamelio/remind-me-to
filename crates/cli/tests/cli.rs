@@ -63,10 +63,7 @@ fn dry_run_single_reminder() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(dir.path()));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
     });
 }
 
@@ -87,10 +84,7 @@ fn middle() {}
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(&file));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(&file));
     });
 }
 
@@ -99,10 +93,7 @@ fn dry_run_no_reminders() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("clean.rs"), "fn main() {}\n").unwrap();
 
-    assert_cmd_snapshot!(cmd()
-        .arg("check")
-        .arg("--dry-run")
-        .arg(dir.path()));
+    assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
 }
 
 #[test]
@@ -117,10 +108,7 @@ fn dry_run_parse_error() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(dir.path()));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
     });
 }
 
@@ -136,10 +124,7 @@ fn dry_run_mixed_valid_and_error() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(dir.path()));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
     });
 }
 
@@ -159,12 +144,14 @@ fn dry_run_json_format() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg("--format")
-            .arg("json")
-            .arg(dir.path()));
+        assert_cmd_snapshot!(
+            cmd()
+                .arg("check")
+                .arg("--dry-run")
+                .arg("--format")
+                .arg("json")
+                .arg(dir.path())
+        );
     });
 }
 
@@ -181,11 +168,13 @@ fn quiet_produces_no_output() {
     )
     .unwrap();
 
-    assert_cmd_snapshot!(cmd()
-        .arg("check")
-        .arg("--dry-run")
-        .arg("--quiet")
-        .arg(dir.path()));
+    assert_cmd_snapshot!(
+        cmd()
+            .arg("check")
+            .arg("--dry-run")
+            .arg("--quiet")
+            .arg(dir.path())
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +232,11 @@ fn dry_run_rust_comment() {
 fn dry_run_python_comment() {
     let dir = TempDir::new().unwrap();
     let file = dir.path().join("test.py");
-    fs::write(&file, "# remind-me-to: python tag_exists=github:c/d@>=1.0\n").unwrap();
+    fs::write(
+        &file,
+        "# remind-me-to: python tag_exists=github:c/d@>=1.0\n",
+    )
+    .unwrap();
 
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
@@ -269,7 +262,11 @@ fn dry_run_lua_comment() {
 fn dry_run_html_comment() {
     let dir = TempDir::new().unwrap();
     let file = dir.path().join("test.html");
-    fs::write(&file, "<!-- REMIND-ME-TO: html date_passed=2025-01-01 -->\n").unwrap();
+    fs::write(
+        &file,
+        "<!-- REMIND-ME-TO: html date_passed=2025-01-01 -->\n",
+    )
+    .unwrap();
 
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
@@ -296,10 +293,7 @@ fn main() {
     )
     .unwrap();
 
-    assert_cmd_snapshot!(cmd()
-        .arg("check")
-        .arg("--dry-run")
-        .arg(dir.path()));
+    assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
 }
 
 // ---------------------------------------------------------------------------
@@ -315,10 +309,7 @@ fn description_only_not_emitted() {
     )
     .unwrap();
 
-    assert_cmd_snapshot!(cmd()
-        .arg("check")
-        .arg("--dry-run")
-        .arg(dir.path()));
+    assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
 }
 
 // ---------------------------------------------------------------------------
@@ -338,10 +329,7 @@ fn dry_run_single_file_path() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(&file));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(&file));
     });
 }
 
@@ -361,9 +349,6 @@ fn dry_run_multiple_ops_one_line() {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(&regex::escape(dir.path().to_str().unwrap()), "[DIR]");
     settings.bind(|| {
-        assert_cmd_snapshot!(cmd()
-            .arg("check")
-            .arg("--dry-run")
-            .arg(dir.path()));
+        assert_cmd_snapshot!(cmd().arg("check").arg("--dry-run").arg(dir.path()));
     });
 }

@@ -105,7 +105,8 @@ fn check_with_manual_comparison(op: &str, ver_str: &str, tags: &[String]) -> Opt
                 tracing::warn!(
                     "constraint '{}{}' uses ^/~ but version doesn't look like semver. \
                      Falling back to >= behavior. Consider using >= instead.",
-                    op, ver_str
+                    op,
+                    ver_str
                 );
                 tag_ver >= constraint_ver
             }
@@ -156,13 +157,14 @@ fn warn_if_non_semver_caret_tilde(constraint: &str, req: &Requirement) {
 
     if uses_caret_or_tilde
         && let Some(ref ver) = req.version
-            && !matches!(ver, Versioning::Ideal(_)) {
-                tracing::warn!(
-                    "constraint '{}' uses ^/~ but version doesn't look like semver. \
+        && !matches!(ver, Versioning::Ideal(_))
+    {
+        tracing::warn!(
+            "constraint '{}' uses ^/~ but version doesn't look like semver. \
                      Consider using >= instead.",
-                    constraint
-                );
-            }
+            constraint
+        );
+    }
 }
 
 #[cfg(test)]

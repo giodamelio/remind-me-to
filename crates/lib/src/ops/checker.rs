@@ -10,10 +10,7 @@ pub fn check_all(
     client: &dyn ForgeClient,
     max_concurrent: usize,
 ) -> CheckResult {
-    tracing::debug!(
-        reminders = reminders.len(),
-        "checking operations"
-    );
+    tracing::debug!(reminders = reminders.len(), "checking operations");
 
     // Deduplicate operations across all reminders
     let mut unique_ops: Vec<Operation> = Vec::new();
@@ -35,19 +32,20 @@ pub fn check_all(
     );
 
     // Check all unique operations (in parallel if there are enough)
-    let op_results: HashMap<String, OperationResult> = if unique_ops.len() <= 2 || max_concurrent <= 1 {
-        // Sequential for small sets
-        unique_ops
-            .iter()
-            .map(|op| {
-                let result = check_one(op, client);
-                (op.to_string(), result)
-            })
-            .collect()
-    } else {
-        // Parallel for larger sets
-        check_parallel(&unique_ops, client, max_concurrent)
-    };
+    let op_results: HashMap<String, OperationResult> =
+        if unique_ops.len() <= 2 || max_concurrent <= 1 {
+            // Sequential for small sets
+            unique_ops
+                .iter()
+                .map(|op| {
+                    let result = check_one(op, client);
+                    (op.to_string(), result)
+                })
+                .collect()
+        } else {
+            // Parallel for larger sets
+            check_parallel(&unique_ops, client, max_concurrent)
+        };
 
     // Map results back to reminders
     let mut errors = Vec::new();
@@ -59,14 +57,11 @@ pub fn check_all(
                 .iter()
                 .map(|op| {
                     let key = op.to_string();
-                    op_results
-                        .get(&key)
-                        .cloned()
-                        .unwrap_or(OperationResult {
-                            operation: op.clone(),
-                            status: OperationStatus::Error,
-                            detail: Some("operation not checked".to_string()),
-                        })
+                    op_results.get(&key).cloned().unwrap_or(OperationResult {
+                        operation: op.clone(),
+                        status: OperationStatus::Error,
+                        detail: Some("operation not checked".to_string()),
+                    })
                 })
                 .collect();
 
@@ -77,9 +72,10 @@ pub fn check_all(
             // Collect errors
             for r in &results {
                 if r.status == OperationStatus::Error
-                    && let Some(ref detail) = r.detail {
-                        errors.push(detail.clone());
-                    }
+                    && let Some(ref detail) = r.detail
+                {
+                    errors.push(detail.clone());
+                }
             }
 
             CheckedReminder {
@@ -147,7 +143,11 @@ fn check_one(op: &Operation, client: &dyn ForgeClient) -> OperationResult {
 
 fn check_pr_merged(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::PrMerged(issue_ref.clone());
-    match client.get_pr_status(&issue_ref.forge_ref.owner, &issue_ref.forge_ref.repo, issue_ref.number) {
+    match client.get_pr_status(
+        &issue_ref.forge_ref.owner,
+        &issue_ref.forge_ref.repo,
+        issue_ref.number,
+    ) {
         Ok(pr) => {
             if pr.merged {
                 OperationResult {
@@ -173,7 +173,11 @@ fn check_pr_merged(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationR
 
 fn check_pr_closed(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::PrClosed(issue_ref.clone());
-    match client.get_pr_status(&issue_ref.forge_ref.owner, &issue_ref.forge_ref.repo, issue_ref.number) {
+    match client.get_pr_status(
+        &issue_ref.forge_ref.owner,
+        &issue_ref.forge_ref.repo,
+        issue_ref.number,
+    ) {
         Ok(pr) => {
             if pr.state == PrState::Closed {
                 OperationResult {
@@ -232,7 +236,11 @@ fn check_tag_exists(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResu
 
 fn check_commit_released(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::CommitReleased(ref_ref.clone());
-    match client.get_commit_releases(&ref_ref.forge_ref.owner, &ref_ref.forge_ref.repo, &ref_ref.value) {
+    match client.get_commit_releases(
+        &ref_ref.forge_ref.owner,
+        &ref_ref.forge_ref.repo,
+        &ref_ref.value,
+    ) {
         Ok(releases) => {
             if releases.is_empty() {
                 OperationResult {
@@ -269,7 +277,11 @@ fn check_commit_released(ref_ref: &RefRef, client: &dyn ForgeClient) -> Operatio
 fn check_pr_released(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::PrReleased(issue_ref.clone());
     // First get the PR to find merge commit SHA
-    match client.get_pr_status(&issue_ref.forge_ref.owner, &issue_ref.forge_ref.repo, issue_ref.number) {
+    match client.get_pr_status(
+        &issue_ref.forge_ref.owner,
+        &issue_ref.forge_ref.repo,
+        issue_ref.number,
+    ) {
         Ok(pr) => {
             if !pr.merged {
                 return OperationResult {
@@ -304,7 +316,11 @@ fn check_pr_released(issue_ref: &IssueRef, client: &dyn ForgeClient) -> Operatio
 
 fn check_issue_closed(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::IssueClosed(issue_ref.clone());
-    match client.get_issue_status(&issue_ref.forge_ref.owner, &issue_ref.forge_ref.repo, issue_ref.number) {
+    match client.get_issue_status(
+        &issue_ref.forge_ref.owner,
+        &issue_ref.forge_ref.repo,
+        issue_ref.number,
+    ) {
         Ok(issue) => {
             if issue.state == IssueState::Closed {
                 OperationResult {
@@ -330,7 +346,11 @@ fn check_issue_closed(issue_ref: &IssueRef, client: &dyn ForgeClient) -> Operati
 
 fn check_branch_deleted(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResult {
     let op = Operation::BranchDeleted(ref_ref.clone());
-    match client.branch_exists(&ref_ref.forge_ref.owner, &ref_ref.forge_ref.repo, &ref_ref.value) {
+    match client.branch_exists(
+        &ref_ref.forge_ref.owner,
+        &ref_ref.forge_ref.repo,
+        &ref_ref.value,
+    ) {
         Ok(exists) => {
             if !exists {
                 OperationResult {

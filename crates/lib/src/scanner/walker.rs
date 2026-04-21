@@ -82,7 +82,11 @@ pub fn walk_paths(
     let entries: Vec<_> = rx.into_iter().collect();
     let errors: Vec<_> = err_rx.into_iter().collect();
 
-    tracing::debug!(files = entries.len(), errors = errors.len(), "walk finished");
+    tracing::debug!(
+        files = entries.len(),
+        errors = errors.len(),
+        "walk finished"
+    );
 
     (entries, errors)
 }

@@ -287,7 +287,12 @@ mod tests {
 
         // Add origin remote
         Command::new("git")
-            .args(["remote", "add", "origin", "https://github.com/test-owner/test-repo.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/test-owner/test-repo.git",
+            ])
             .current_dir(path)
             .output()
             .unwrap();
@@ -310,13 +315,23 @@ mod tests {
             .unwrap();
 
         Command::new("git")
-            .args(["remote", "add", "origin", "https://github.com/fork-owner/repo.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/fork-owner/repo.git",
+            ])
             .current_dir(path)
             .output()
             .unwrap();
 
         Command::new("git")
-            .args(["remote", "add", "upstream", "https://github.com/upstream-owner/repo.git"])
+            .args([
+                "remote",
+                "add",
+                "upstream",
+                "https://github.com/upstream-owner/repo.git",
+            ])
             .current_dir(path)
             .output()
             .unwrap();

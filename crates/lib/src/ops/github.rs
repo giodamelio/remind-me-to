@@ -3,9 +3,7 @@ use serde::Deserialize;
 use ureq::{Agent, Body};
 
 use crate::errors::CheckError;
-use crate::ops::types::{
-    ForgeClient, IssueState, IssueStatus, PrState, PrStatus, Release, Tag,
-};
+use crate::ops::types::{ForgeClient, IssueState, IssueStatus, PrState, PrStatus, Release, Tag};
 
 /// GitHub API client using ureq.
 pub struct GitHubClient {
@@ -67,10 +65,8 @@ impl GitHubClient {
                     tracing::info!("rate limited, waiting {}s before retry", wait);
                     std::thread::sleep(std::time::Duration::from_secs(wait));
                 }
-                self.get(path).map_err(|_| CheckError::RateLimited {
-                    forge,
-                    reset_at,
-                })
+                self.get(path)
+                    .map_err(|_| CheckError::RateLimited { forge, reset_at })
             }
             Err(e) => Err(e),
         }
@@ -108,21 +104,19 @@ impl GitHubClient {
     fn check_rate_limit_headers(&self, response: &Response<Body>) {
         if let Some(remaining) = response.headers().get("X-RateLimit-Remaining")
             && let Ok(remaining_str) = remaining.to_str()
-                && let Ok(n) = remaining_str.parse::<u64>() {
-                    if n == 0 {
-                        let reset = response
-                            .headers()
-                            .get("X-RateLimit-Reset")
-                            .and_then(|v| v.to_str().ok())
-                            .unwrap_or("unknown");
-                        tracing::warn!(
-                            "GitHub rate limit exhausted, resets at {}",
-                            reset
-                        );
-                    } else if n < 10 {
-                        tracing::debug!("GitHub rate limit remaining: {}", n);
-                    }
-                }
+            && let Ok(n) = remaining_str.parse::<u64>()
+        {
+            if n == 0 {
+                let reset = response
+                    .headers()
+                    .get("X-RateLimit-Reset")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("unknown");
+                tracing::warn!("GitHub rate limit exhausted, resets at {}", reset);
+            } else if n < 10 {
+                tracing::debug!("GitHub rate limit remaining: {}", n);
+            }
+        }
     }
 
     /// Fetch all tags with pagination.
@@ -131,16 +125,15 @@ impl GitHubClient {
         let mut page = 1;
 
         loop {
-            let path = format!(
-                "/repos/{owner}/{repo}/tags?per_page=100&page={page}"
-            );
+            let path = format!("/repos/{owner}/{repo}/tags?per_page=100&page={page}");
             let mut response = self.get_with_retry(&path)?;
-            let github_tags: Vec<GitHubTag> = response
-                .body_mut()
-                .read_json()
-                .map_err(|e| CheckError::Network {
-                    message: format!("failed to parse tags response: {e}"),
-                })?;
+            let github_tags: Vec<GitHubTag> =
+                response
+                    .body_mut()
+                    .read_json()
+                    .map_err(|e| CheckError::Network {
+                        message: format!("failed to parse tags response: {e}"),
+                    })?;
 
             if github_tags.is_empty() {
                 break;
@@ -165,21 +158,15 @@ impl GitHubClient {
 }
 
 impl ForgeClient for GitHubClient {
-    fn get_pr_status(
-        &self,
-        owner: &str,
-        repo: &str,
-        number: u64,
-    ) -> Result<PrStatus, CheckError> {
+    fn get_pr_status(&self, owner: &str, repo: &str, number: u64) -> Result<PrStatus, CheckError> {
         let path = format!("/repos/{owner}/{repo}/pulls/{number}");
         let mut response = self.get_with_retry(&path)?;
-        let pr: GitHubPr =
-            response
-                .body_mut()
-                .read_json()
-                .map_err(|e| CheckError::Network {
-                    message: format!("failed to parse PR response: {e}"),
-                })?;
+        let pr: GitHubPr = response
+            .body_mut()
+            .read_json()
+            .map_err(|e| CheckError::Network {
+                message: format!("failed to parse PR response: {e}"),
+            })?;
 
         Ok(PrStatus {
             number: pr.number,
@@ -224,12 +211,7 @@ impl ForgeClient for GitHubClient {
         })
     }
 
-    fn branch_exists(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<bool, CheckError> {
+    fn branch_exists(&self, owner: &str, repo: &str, branch: &str) -> Result<bool, CheckError> {
         let path = format!("/repos/{owner}/{repo}/branches/{branch}");
         match self.get_with_retry(&path) {
             Ok(_) => Ok(true),
@@ -304,7 +286,7 @@ struct GitHubRelease {
 
 pub mod mock {
     use std::collections::HashMap;
-    use std::sync::{atomic::AtomicUsize, atomic::Ordering, RwLock};
+    use std::sync::{RwLock, atomic::AtomicUsize, atomic::Ordering};
 
     use crate::errors::CheckError;
     use crate::ops::types::*;
@@ -405,12 +387,7 @@ pub mod mock {
                 }))
         }
 
-        fn branch_exists(
-            &self,
-            owner: &str,
-            repo: &str,
-            branch: &str,
-        ) -> Result<bool, CheckError> {
+        fn branch_exists(&self, owner: &str, repo: &str, branch: &str) -> Result<bool, CheckError> {
             self.record_call("branch_exists");
             self.branch_responses
                 .get(&(owner.into(), repo.into(), branch.into()))
@@ -504,13 +481,15 @@ mod tests {
     #[test]
     fn mock_branch_exists() {
         let mut mock = MockForgeClient::new();
-        mock.branch_responses.insert(
-            ("owner".into(), "repo".into(), "main".into()),
-            Ok(true),
-        );
+        mock.branch_responses
+            .insert(("owner".into(), "repo".into(), "main".into()), Ok(true));
 
         assert!(mock.branch_exists("owner", "repo", "main").unwrap());
-        assert!(!mock.branch_exists("owner", "repo", "deleted-branch").unwrap());
+        assert!(
+            !mock
+                .branch_exists("owner", "repo", "deleted-branch")
+                .unwrap()
+        );
     }
 
     #[test]

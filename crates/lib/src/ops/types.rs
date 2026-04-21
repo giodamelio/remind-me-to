@@ -182,11 +182,7 @@ pub trait ForgeClient: Send + Sync {
         number: u64,
     ) -> Result<PrStatus, crate::errors::CheckError>;
 
-    fn get_tags(
-        &self,
-        owner: &str,
-        repo: &str,
-    ) -> Result<Vec<Tag>, crate::errors::CheckError>;
+    fn get_tags(&self, owner: &str, repo: &str) -> Result<Vec<Tag>, crate::errors::CheckError>;
 
     fn get_issue_status(
         &self,

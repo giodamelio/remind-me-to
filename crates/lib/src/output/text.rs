@@ -6,8 +6,7 @@ use crate::ops::types::{CheckResult, CheckedReminder, OperationStatus};
 pub fn format_text(result: &CheckResult, verbose: u8) {
     let triggered: Vec<&CheckedReminder> =
         result.reminders.iter().filter(|r| r.triggered).collect();
-    let pending: Vec<&CheckedReminder> =
-        result.reminders.iter().filter(|r| !r.triggered).collect();
+    let pending: Vec<&CheckedReminder> = result.reminders.iter().filter(|r| !r.triggered).collect();
 
     if triggered.is_empty() && verbose == 0 {
         println!(

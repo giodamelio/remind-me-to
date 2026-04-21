@@ -18,10 +18,7 @@ pub fn format_llm(result: &CheckResult) {
         println!("## Reminder {}", i + 1);
         println!("- **File:** {}", reminder.reminder.file.display());
         println!("- **Line:** {}", reminder.reminder.line);
-        println!(
-            "- **Description:** {}",
-            reminder.reminder.description
-        );
+        println!("- **Description:** {}", reminder.reminder.description);
         println!("- **Conditions met:**");
 
         for op_result in &reminder.results {
@@ -30,15 +27,14 @@ pub fn format_llm(result: &CheckResult) {
                 OperationStatus::Pending => "NOT MET",
                 OperationStatus::Error => "ERROR",
             };
-            let detail = op_result
-                .detail
-                .as_deref()
-                .unwrap_or("no details");
+            let detail = op_result.detail.as_deref().unwrap_or("no details");
             println!("  - `{}`: {} — {}", op_result.operation, status, detail);
         }
 
         println!();
     }
 
-    println!("Please review each reminder and take the described action. The conditions that triggered these reminders indicate it's time to remove workarounds, update code, or complete cleanup tasks as described.");
+    println!(
+        "Please review each reminder and take the described action. The conditions that triggered these reminders indicate it's time to remove workarounds, update code, or complete cleanup tasks as described."
+    );
 }

@@ -14,14 +14,14 @@ pub fn scan(
     respect_gitignore: bool,
     extra_ignore_patterns: &[String],
 ) -> ScanResult {
-    tracing::info!(
+    tracing::debug!(
         paths = ?paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
         respect_gitignore,
         "starting scan"
     );
 
     let (entries, mut errors) = walker::walk_paths(paths, respect_gitignore, extra_ignore_patterns);
-    tracing::info!(files = entries.len(), walk_errors = errors.len(), "file walk complete");
+    tracing::debug!(files = entries.len(), walk_errors = errors.len(), "file walk complete");
 
     let mut all_reminders: Vec<Reminder> = Vec::new();
 
@@ -51,9 +51,9 @@ pub fn scan(
         }
     }
 
-    tracing::info!(
-        total_reminders = all_reminders.len(),
-        total_errors = errors.len(),
+    tracing::debug!(
+        reminders = all_reminders.len(),
+        errors = errors.len(),
         "scan complete"
     );
 

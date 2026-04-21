@@ -10,9 +10,8 @@ pub fn check_all(
     client: &dyn ForgeClient,
     max_concurrent: usize,
 ) -> CheckResult {
-    tracing::info!(
+    tracing::debug!(
         reminders = reminders.len(),
-        max_concurrent,
         "checking operations"
     );
 

@@ -55,7 +55,7 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
 
-        /// Increase verbosity (-v info, -vv debug, -vvv trace)
+        /// Increase verbosity (-v debug, -vv trace, -vvv trace with targets)
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
 
@@ -101,6 +101,59 @@ fn configure_color(mode: &ColorMode) -> bool {
     }
 }
 
+/// Custom tracing formatter that omits the level prefix for INFO events
+/// (since info is the default level and the prefix is noise), but shows
+/// the level for everything else.
+struct CustomFormatter {
+    show_targets: bool,
+    use_ansi: bool,
+}
+
+impl<S, N> fmt::FormatEvent<S, N> for CustomFormatter
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    N: for<'a> fmt::FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &fmt::FmtContext<'_, S, N>,
+        mut writer: fmt::format::Writer<'_>,
+        event: &tracing::Event<'_>,
+    ) -> std::fmt::Result {
+        let level = *event.metadata().level();
+
+        // Only print level prefix for non-INFO levels
+        if level != tracing::Level::INFO {
+            if self.use_ansi {
+                use colored::Colorize;
+                let level_str = match level {
+                    tracing::Level::ERROR => "ERROR".red().bold().to_string(),
+                    tracing::Level::WARN => " WARN".yellow().to_string(),
+                    tracing::Level::DEBUG => "DEBUG".blue().to_string(),
+                    tracing::Level::TRACE => "TRACE".purple().to_string(),
+                    _ => level.to_string(),
+                };
+                write!(writer, "{level_str} ")?;
+            } else {
+                write!(writer, "{level:>5} ")?;
+            }
+        }
+
+        if self.show_targets
+            && let Some(target) = event.metadata().module_path() {
+                if self.use_ansi {
+                    use colored::Colorize;
+                    write!(writer, "{} ", target.dimmed())?;
+                } else {
+                    write!(writer, "{target} ")?;
+                }
+            }
+
+        ctx.field_format().format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
+    }
+}
+
 fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
     let default_directive = if quiet {
         "error"
@@ -108,9 +161,9 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
         level.as_str()
     } else {
         match verbosity {
-            0 => "warn",
-            1 => "info",
-            2 => "debug",
+            0 => "info",
+            1 => "debug",
+            2 => "trace",
             _ => "trace",
         }
     };
@@ -118,12 +171,14 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(format!("remind_me_to={default_directive}")));
 
+    let show_targets = verbosity >= 3;
+
     let fmt_layer = fmt::layer()
-        .compact()
         .with_writer(std::io::stderr)
-        .with_target(verbosity >= 3)
         .with_ansi(use_ansi)
-        .with_span_events(fmt::format::FmtSpan::CLOSE);
+        .with_target(show_targets)
+        .with_span_events(fmt::format::FmtSpan::CLOSE)
+        .event_format(CustomFormatter { show_targets, use_ansi });
 
     tracing_subscriber::registry()
         .with(env_filter)

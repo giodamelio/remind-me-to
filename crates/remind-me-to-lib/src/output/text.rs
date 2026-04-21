@@ -3,13 +3,13 @@ use colored::Colorize;
 use crate::ops::types::{CheckResult, CheckedReminder, OperationStatus};
 
 /// Format check results as human-readable text output.
-pub fn format_text(result: &CheckResult, verbose: bool) {
+pub fn format_text(result: &CheckResult, verbose: u8) {
     let triggered: Vec<&CheckedReminder> =
         result.reminders.iter().filter(|r| r.triggered).collect();
     let pending: Vec<&CheckedReminder> =
         result.reminders.iter().filter(|r| !r.triggered).collect();
 
-    if triggered.is_empty() && !verbose {
+    if triggered.is_empty() && verbose == 0 {
         println!(
             "{} reminder(s) found, {} triggered.",
             result.reminders.len().to_string().bold(),
@@ -22,7 +22,7 @@ pub fn format_text(result: &CheckResult, verbose: bool) {
         print_reminder(reminder);
     }
 
-    if verbose && !pending.is_empty() {
+    if verbose > 0 && !pending.is_empty() {
         println!("{}\n", "--- Pending reminders ---".dimmed());
         for reminder in &pending {
             print_reminder(reminder);

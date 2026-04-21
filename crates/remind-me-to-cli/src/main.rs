@@ -55,9 +55,9 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
 
-        /// Show all found reminders, including ones not yet triggered
-        #[arg(short, long)]
-        verbose: bool,
+        /// Increase verbosity (-v info, -vv debug, -vvv trace)
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
 
         /// Suppress all output, only set exit code
         #[arg(short, long)]
@@ -101,15 +101,18 @@ fn configure_color(mode: &ColorMode) -> bool {
     }
 }
 
-fn init_tracing(verbose: bool, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
+fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
     let default_directive = if quiet {
         "error"
     } else if let Some(level) = log_level {
         level.as_str()
-    } else if verbose {
-        "info"
     } else {
-        "warn"
+        match verbosity {
+            0 => "warn",
+            1 => "info",
+            2 => "debug",
+            _ => "trace",
+        }
     };
 
     let env_filter = EnvFilter::try_from_default_env()
@@ -118,7 +121,7 @@ fn init_tracing(verbose: bool, quiet: bool, log_level: &Option<String>, use_ansi
     let fmt_layer = fmt::layer()
         .compact()
         .with_writer(std::io::stderr)
-        .with_target(false)
+        .with_target(verbosity >= 3)
         .with_ansi(use_ansi)
         .with_span_events(fmt::format::FmtSpan::CLOSE);
 

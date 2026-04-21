@@ -8,8 +8,12 @@ use crate::ops::types::{ForgeRef, IssueRef, Operation, RefRef, Reminder};
 /// The case-insensitive marker we search for in each line.
 const MARKER: &str = "remind-me-to:";
 
-/// Known comment prefix patterns.
-const COMMENT_PREFIXES: &[&str] = &["//", "#", "--", "/*", "<!--", "%", ";", "*"];
+/// Comment prefixes that are valid at the start of a line's trimmed content.
+const LINE_START_PREFIXES: &[&str] = &["//", "#", "--", "/*", "<!--", "%", ";", "* "];
+
+/// Comment prefixes that can appear mid-line (after code). These must be
+/// multi-character to avoid false positives from operators or markdown.
+const INLINE_PREFIXES: &[&str] = &["//", "/*", "<!--"];
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -46,7 +50,15 @@ pub fn parse_file(path: &Path, content: &str) -> ScanResult {
                 });
             }
 
-            if ops.is_empty() && description.is_empty() {
+            if ops.is_empty() {
+                if !description.is_empty() {
+                    tracing::warn!(
+                        "{}:{}: reminder has no operations: {}",
+                        path.display(),
+                        line_num,
+                        description,
+                    );
+                }
                 continue;
             }
 
@@ -87,7 +99,7 @@ fn looks_like_comment(before: &str) -> bool {
     let trimmed = before.trim();
 
     // Line starts with a comment prefix – most common case.
-    if COMMENT_PREFIXES
+    if LINE_START_PREFIXES
         .iter()
         .any(|p| trimmed.starts_with(p))
     {
@@ -95,9 +107,9 @@ fn looks_like_comment(before: &str) -> bool {
     }
 
     // Inline comment after code: `some_code(); // …`
-    // Accept if a comment prefix appears with an even number of preceding
-    // double-quotes (i.e. the prefix is outside string literals).
-    for prefix in COMMENT_PREFIXES {
+    // Only use multi-character prefixes here to avoid matching markdown
+    // bullets, operators, etc.
+    for prefix in INLINE_PREFIXES {
         if let Some(pos) = trimmed.rfind(prefix) {
             let quotes = trimmed[..pos].chars().filter(|&c| c == '"').count();
             if quotes % 2 == 0 {
@@ -489,11 +501,12 @@ fn foo() {}
     }
 
     #[test]
-    fn description_only_no_operations() {
+    fn description_only_no_operations_is_skipped() {
+        // A reminder with only description and no operations is not emitted —
+        // it produces a tracing warning instead.
         let r = parse("// REMIND-ME-TO: just a note with no operations");
-        assert_eq!(r.reminders.len(), 1);
-        assert!(r.reminders[0].operations.is_empty());
-        assert_eq!(r.reminders[0].description, "just a note with no operations");
+        assert!(r.reminders.is_empty());
+        assert!(r.errors.is_empty());
     }
 
     #[test]

@@ -173,6 +173,15 @@ pub struct Release {
     pub target_commitish: String,
 }
 
+/// Result of comparing two commits
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AncestorStatus {
+    /// The commit is an ancestor of (or identical to) the target
+    Ancestor,
+    /// The commit is NOT an ancestor of the target
+    NotAncestor,
+}
+
 /// The ForgeClient trait — injectable for testing
 pub trait ForgeClient: Send + Sync {
     fn get_pr_status(
@@ -198,10 +207,17 @@ pub trait ForgeClient: Send + Sync {
         branch: &str,
     ) -> Result<bool, crate::errors::CheckError>;
 
-    fn get_commit_releases(
+    fn get_latest_release(
         &self,
         owner: &str,
         repo: &str,
-        sha: &str,
-    ) -> Result<Vec<Release>, crate::errors::CheckError>;
+    ) -> Result<Option<Release>, crate::errors::CheckError>;
+
+    fn is_ancestor(
+        &self,
+        owner: &str,
+        repo: &str,
+        commit: &str,
+        of: &str,
+    ) -> Result<AncestorStatus, crate::errors::CheckError>;
 }

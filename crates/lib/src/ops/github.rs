@@ -3,7 +3,9 @@ use serde::Deserialize;
 use ureq::{Agent, Body};
 
 use crate::errors::CheckError;
-use crate::ops::types::{ForgeClient, IssueState, IssueStatus, PrState, PrStatus, Release, Tag};
+use crate::ops::types::{
+    AncestorStatus, ForgeClient, IssueState, IssueStatus, PrState, PrStatus, Release, Tag,
+};
 
 /// GitHub API client using ureq.
 pub struct GitHubClient {
@@ -222,29 +224,53 @@ impl ForgeClient for GitHubClient {
         }
     }
 
-    fn get_commit_releases(
+    fn get_latest_release(&self, owner: &str, repo: &str) -> Result<Option<Release>, CheckError> {
+        let path = format!("/repos/{owner}/{repo}/releases/latest");
+        match self.get_with_retry(&path) {
+            Ok(mut response) => {
+                let release: GitHubRelease =
+                    response
+                        .body_mut()
+                        .read_json()
+                        .map_err(|e| CheckError::Network {
+                            message: format!("failed to parse release response: {e}"),
+                        })?;
+                Ok(Some(Release {
+                    tag_name: release.tag_name,
+                    target_commitish: release.target_commitish,
+                }))
+            }
+            Err(CheckError::ApiError {
+                status: Some(404), ..
+            }) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn is_ancestor(
         &self,
         owner: &str,
         repo: &str,
-        _sha: &str,
-    ) -> Result<Vec<Release>, CheckError> {
-        let path = format!("/repos/{owner}/{repo}/releases?per_page=100");
+        commit: &str,
+        of: &str,
+    ) -> Result<AncestorStatus, CheckError> {
+        let path = format!("/repos/{owner}/{repo}/compare/{commit}...{of}");
         let mut response = self.get_with_retry(&path)?;
-        let releases: Vec<GitHubRelease> =
+        let compare: GitHubCompare =
             response
                 .body_mut()
                 .read_json()
                 .map_err(|e| CheckError::Network {
-                    message: format!("failed to parse releases response: {e}"),
+                    message: format!("failed to parse compare response: {e}"),
                 })?;
 
-        Ok(releases
-            .into_iter()
-            .map(|r| Release {
-                tag_name: r.tag_name,
-                target_commitish: r.target_commitish,
-            })
-            .collect())
+        // If the target (release) is "ahead" or "identical" relative to the commit,
+        // then the commit is an ancestor of (i.e. included in) the target.
+        if compare.status == "ahead" || compare.status == "identical" {
+            Ok(AncestorStatus::Ancestor)
+        } else {
+            Ok(AncestorStatus::NotAncestor)
+        }
     }
 }
 
@@ -282,6 +308,11 @@ struct GitHubRelease {
     target_commitish: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct GitHubCompare {
+    status: String,
+}
+
 // ---- Mock client for testing ----
 
 pub mod mock {
@@ -297,7 +328,10 @@ pub mod mock {
         pub tag_responses: HashMap<(String, String), Result<Vec<Tag>, CheckError>>,
         pub issue_responses: HashMap<(String, String, u64), Result<IssueStatus, CheckError>>,
         pub branch_responses: HashMap<(String, String, String), Result<bool, CheckError>>,
-        pub release_responses: HashMap<(String, String), Result<Vec<Release>, CheckError>>,
+        pub latest_release_responses:
+            HashMap<(String, String), Result<Option<Release>, CheckError>>,
+        pub ancestor_responses:
+            HashMap<(String, String, String, String), Result<AncestorStatus, CheckError>>,
         call_counts: RwLock<HashMap<String, AtomicUsize>>,
     }
 
@@ -314,7 +348,8 @@ pub mod mock {
                 tag_responses: HashMap::new(),
                 issue_responses: HashMap::new(),
                 branch_responses: HashMap::new(),
-                release_responses: HashMap::new(),
+                latest_release_responses: HashMap::new(),
+                ancestor_responses: HashMap::new(),
                 call_counts: RwLock::new(HashMap::new()),
             }
         }
@@ -395,17 +430,30 @@ pub mod mock {
                 .unwrap_or(Ok(false))
         }
 
-        fn get_commit_releases(
+        fn get_latest_release(
             &self,
             owner: &str,
             repo: &str,
-            _sha: &str,
-        ) -> Result<Vec<Release>, CheckError> {
-            self.record_call("get_commit_releases");
-            self.release_responses
+        ) -> Result<Option<Release>, CheckError> {
+            self.record_call("get_latest_release");
+            self.latest_release_responses
                 .get(&(owner.into(), repo.into()))
                 .cloned()
-                .unwrap_or(Ok(vec![]))
+                .unwrap_or(Ok(None))
+        }
+
+        fn is_ancestor(
+            &self,
+            owner: &str,
+            repo: &str,
+            commit: &str,
+            of: &str,
+        ) -> Result<AncestorStatus, CheckError> {
+            self.record_call("is_ancestor");
+            self.ancestor_responses
+                .get(&(owner.into(), repo.into(), commit.into(), of.into()))
+                .cloned()
+                .unwrap_or(Ok(AncestorStatus::NotAncestor))
         }
     }
 }

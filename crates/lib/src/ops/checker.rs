@@ -234,44 +234,63 @@ fn check_tag_exists(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResu
     }
 }
 
-fn check_commit_released(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResult {
-    let op = Operation::CommitReleased(ref_ref.clone());
-    match client.get_commit_releases(
-        &ref_ref.forge_ref.owner,
-        &ref_ref.forge_ref.repo,
-        &ref_ref.value,
-    ) {
-        Ok(releases) => {
-            if releases.is_empty() {
-                OperationResult {
-                    operation: op,
-                    status: OperationStatus::Pending,
-                    detail: Some("no releases found".to_string()),
-                }
-            } else {
-                // Check if commit is in any release (simplified: check target_commitish)
-                let in_release = releases.iter().any(|r| r.target_commitish == ref_ref.value);
-                if in_release {
-                    OperationResult {
-                        operation: op,
-                        status: OperationStatus::Triggered,
-                        detail: Some("commit found in release".to_string()),
-                    }
-                } else {
-                    OperationResult {
-                        operation: op,
-                        status: OperationStatus::Pending,
-                        detail: Some("commit not in any release".to_string()),
-                    }
-                }
-            }
+/// Check if a commit SHA is included in the latest release.
+/// The `op` parameter allows callers to preserve their original operation type.
+fn check_sha_released(
+    owner: &str,
+    repo: &str,
+    sha: &str,
+    op: Operation,
+    client: &dyn ForgeClient,
+) -> OperationResult {
+    // Fetch the latest release
+    let release = match client.get_latest_release(owner, repo) {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return OperationResult {
+                operation: op,
+                status: OperationStatus::Pending,
+                detail: Some("no releases found".to_string()),
+            };
         }
+        Err(e) => {
+            return OperationResult {
+                operation: op,
+                status: OperationStatus::Error,
+                detail: Some(e.to_string()),
+            };
+        }
+    };
+
+    // Check if the commit is an ancestor of the latest release tag
+    match client.is_ancestor(owner, repo, sha, &release.tag_name) {
+        Ok(AncestorStatus::Ancestor) => OperationResult {
+            operation: op,
+            status: OperationStatus::Triggered,
+            detail: Some(format!("included in release {}", release.tag_name)),
+        },
+        Ok(AncestorStatus::NotAncestor) => OperationResult {
+            operation: op,
+            status: OperationStatus::Pending,
+            detail: Some(format!("not in latest release ({})", release.tag_name)),
+        },
         Err(e) => OperationResult {
             operation: op,
             status: OperationStatus::Error,
             detail: Some(e.to_string()),
         },
     }
+}
+
+fn check_commit_released(ref_ref: &RefRef, client: &dyn ForgeClient) -> OperationResult {
+    let op = Operation::CommitReleased(ref_ref.clone());
+    check_sha_released(
+        &ref_ref.forge_ref.owner,
+        &ref_ref.forge_ref.repo,
+        &ref_ref.value,
+        op,
+        client,
+    )
 }
 
 fn check_pr_released(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {
@@ -299,12 +318,13 @@ fn check_pr_released(issue_ref: &IssueRef, client: &dyn ForgeClient) -> Operatio
                 };
             };
 
-            // Check if the merge commit is in any release
-            let ref_ref = RefRef {
-                forge_ref: issue_ref.forge_ref.clone(),
-                value: sha,
-            };
-            check_commit_released(&ref_ref, client)
+            check_sha_released(
+                &issue_ref.forge_ref.owner,
+                &issue_ref.forge_ref.repo,
+                &sha,
+                op,
+                client,
+            )
         }
         Err(e) => OperationResult {
             operation: op,

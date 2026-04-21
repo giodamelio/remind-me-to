@@ -14,8 +14,11 @@ pub fn walk_paths(
     extra_ignore_patterns: &[String],
 ) -> (Vec<ignore::DirEntry>, Vec<crate::errors::ScanError>) {
     if paths.is_empty() {
+        tracing::debug!("no paths to walk");
         return (Vec::new(), Vec::new());
     }
+
+    tracing::debug!(roots = paths.len(), "starting parallel file walk");
 
     let mut builder = WalkBuilder::new(paths[0]);
     for path in &paths[1..] {
@@ -53,10 +56,14 @@ pub fn walk_paths(
         let err_tx = err_tx.clone();
         Box::new(move |result| match result {
             Ok(entry) => {
-                if entry.file_type().is_some_and(|ft| ft.is_file())
-                    && !is_binary(entry.path()) {
+                if entry.file_type().is_some_and(|ft| ft.is_file()) {
+                    if is_binary(entry.path()) {
+                        tracing::trace!(file = %entry.path().display(), "skipping binary file");
+                    } else {
+                        tracing::trace!(file = %entry.path().display(), "found file");
                         let _ = tx.send(entry);
                     }
+                }
                 WalkState::Continue
             }
             Err(err) => {
@@ -74,6 +81,8 @@ pub fn walk_paths(
 
     let entries: Vec<_> = rx.into_iter().collect();
     let errors: Vec<_> = err_rx.into_iter().collect();
+
+    tracing::debug!(files = entries.len(), errors = errors.len(), "walk finished");
 
     (entries, errors)
 }

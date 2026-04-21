@@ -10,6 +10,12 @@ pub fn check_all(
     client: &dyn ForgeClient,
     max_concurrent: usize,
 ) -> CheckResult {
+    tracing::info!(
+        reminders = reminders.len(),
+        max_concurrent,
+        "checking operations"
+    );
+
     // Deduplicate operations across all reminders
     let mut unique_ops: Vec<Operation> = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -22,6 +28,12 @@ pub fn check_all(
             }
         }
     }
+
+    tracing::debug!(
+        total_operations = unique_ops.len(),
+        deduplicated_from = reminders.iter().map(|r| r.operations.len()).sum::<usize>(),
+        "deduplicated operations"
+    );
 
     // Check all unique operations (in parallel if there are enough)
     let op_results: HashMap<String, OperationResult> = if unique_ops.len() <= 2 || max_concurrent <= 1 {
@@ -119,7 +131,8 @@ fn check_parallel(
 
 /// Check a single operation against the forge API.
 fn check_one(op: &Operation, client: &dyn ForgeClient) -> OperationResult {
-    match op {
+    tracing::debug!(operation = %op, "checking operation");
+    let result = match op {
         Operation::PrMerged(issue_ref) => check_pr_merged(issue_ref, client),
         Operation::PrClosed(issue_ref) => check_pr_closed(issue_ref, client),
         Operation::TagExists(ref_ref) => check_tag_exists(ref_ref, client),
@@ -128,7 +141,9 @@ fn check_one(op: &Operation, client: &dyn ForgeClient) -> OperationResult {
         Operation::IssueClosed(issue_ref) => check_issue_closed(issue_ref, client),
         Operation::BranchDeleted(ref_ref) => check_branch_deleted(ref_ref, client),
         Operation::DatePassed(date) => check_date_passed(date),
-    }
+    };
+    tracing::debug!(operation = %op, status = ?result.status, "operation result");
+    result
 }
 
 fn check_pr_merged(issue_ref: &IssueRef, client: &dyn ForgeClient) -> OperationResult {

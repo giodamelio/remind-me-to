@@ -14,19 +14,35 @@ pub fn scan(
     respect_gitignore: bool,
     extra_ignore_patterns: &[String],
 ) -> ScanResult {
+    tracing::info!(
+        paths = ?paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+        respect_gitignore,
+        "starting scan"
+    );
+
     let (entries, mut errors) = walker::walk_paths(paths, respect_gitignore, extra_ignore_patterns);
+    tracing::info!(files = entries.len(), walk_errors = errors.len(), "file walk complete");
 
     let mut all_reminders: Vec<Reminder> = Vec::new();
 
     for entry in entries {
         let path = entry.path();
+        tracing::trace!(file = %path.display(), "scanning file");
         match std::fs::read_to_string(path) {
             Ok(content) => {
                 let result = parser::parse_file(path, &content);
+                if !result.reminders.is_empty() {
+                    tracing::debug!(
+                        file = %path.display(),
+                        reminders = result.reminders.len(),
+                        "found reminders"
+                    );
+                }
                 all_reminders.extend(result.reminders);
                 errors.extend(result.errors);
             }
             Err(e) => {
+                tracing::warn!(file = %path.display(), error = %e, "failed to read file");
                 errors.push(ScanError::FileRead {
                     path: path.to_owned(),
                     source: e,
@@ -34,6 +50,12 @@ pub fn scan(
             }
         }
     }
+
+    tracing::info!(
+        total_reminders = all_reminders.len(),
+        total_errors = errors.len(),
+        "scan complete"
+    );
 
     ScanResult {
         reminders: all_reminders,

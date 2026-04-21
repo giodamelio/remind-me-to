@@ -18,6 +18,12 @@ const KNOWN_OPS: &[&str] = &[
     "date_passed",
 ];
 
+/// Known comment prefix patterns. We only recognize a REMIND-ME-TO marker
+/// if the text before it on the line looks like a comment.
+const COMMENT_PREFIXES: &[&str] = &[
+    "//", "#", "--", "/*", "<!--", "%", ";", "*",
+];
+
 /// Parse an entire file, returning all reminders found and any parse errors.
 pub fn parse_file(path: &Path, content: &str) -> ScanResult {
     let mut reminders = Vec::new();
@@ -28,6 +34,13 @@ pub fn parse_file(path: &Path, content: &str) -> ScanResult {
         let lower = line.to_lowercase();
 
         if let Some(marker_pos) = lower.find(MARKER) {
+            // Only recognize the marker if it appears inside a comment.
+            // Check that the text before the marker contains a comment prefix.
+            let before_marker = &line[..marker_pos];
+            if !looks_like_comment(before_marker) {
+                continue;
+            }
+
             let after_marker = marker_pos + MARKER.len();
             let remainder = &line[after_marker..];
 
@@ -42,7 +55,41 @@ pub fn parse_file(path: &Path, content: &str) -> ScanResult {
     ScanResult { reminders, errors }
 }
 
-/// Parse the content after the REMIND-ME-TO: marker on a single line.
+/// Check if the text before the marker looks like it's inside a comment.
+///
+/// We look for a recognized comment prefix in the preceding text, but only
+/// if the prefix appears *outside* of string literals. A simple heuristic:
+/// the first non-whitespace content on the line should start with a comment
+/// prefix, not a quote character or code.
+fn looks_like_comment(before_marker: &str) -> bool {
+    let trimmed = before_marker.trim();
+
+    // If the line starts with a string delimiter before any comment prefix,
+    // this is likely a string literal containing the marker, not a real comment.
+    // Check if a comment prefix appears at the very start of meaningful content.
+    for prefix in COMMENT_PREFIXES {
+        if trimmed.starts_with(prefix) {
+            return true;
+        }
+    }
+
+    // Also handle block comment continuations and inline comments after code.
+    // For inline, check if a comment prefix appears AND no unmatched quotes precede it.
+    for prefix in COMMENT_PREFIXES {
+        if let Some(pos) = trimmed.rfind(prefix) {
+            let before_prefix = &trimmed[..pos];
+            // Count quotes — if the quote count is even, the prefix is outside strings
+            let double_quotes = before_prefix.chars().filter(|&c| c == '"').count();
+            if double_quotes % 2 == 0 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Parse the content after the reminder marker on a single line.
 /// Returns a Reminder (if any operations or description found) and any parse errors.
 fn parse_reminder_line(
     path: &Path,

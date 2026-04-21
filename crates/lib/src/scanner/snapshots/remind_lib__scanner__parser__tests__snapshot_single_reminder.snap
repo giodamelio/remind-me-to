@@ -1,5 +1,5 @@
 ---
-source: crates/remind-me-to-lib/src/scanner/parser.rs
+source: crates/lib/src/scanner/parser.rs
 expression: result.reminders
 ---
 [

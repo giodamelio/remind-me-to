@@ -6,9 +6,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use remind_me_to_lib::errors::FatalError;
-use remind_me_to_lib::ops::github::GitHubClient;
-use remind_me_to_lib::ops::types::ForgeClient;
+use remind_lib::errors::FatalError;
+use remind_lib::ops::github::GitHubClient;
+use remind_lib::ops::types::ForgeClient;
 
 /// A CLI tool that scans source files for REMIND-ME-TO comments and checks
 /// if their conditions have been met.
@@ -169,7 +169,7 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
     };
 
     let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(format!("remind_me_to={default_directive}")));
+        .unwrap_or_else(|_| EnvFilter::new(format!("remind_lib={default_directive},cli={default_directive}")));
 
     let show_targets = verbosity >= 3;
 
@@ -219,7 +219,7 @@ fn run() -> Result<ExitCode, FatalError> {
             }
 
             // Scan for reminders
-            let scan_result = remind_me_to_lib::scanner::scan(
+            let scan_result = remind_lib::scanner::scan(
                 &path_refs,
                 !no_gitignore,
                 &ignore_patterns,
@@ -281,7 +281,7 @@ fn run() -> Result<ExitCode, FatalError> {
             let token = resolve_github_token();
             let client: Box<dyn ForgeClient> = Box::new(GitHubClient::new(token));
 
-            let check_result = remind_me_to_lib::ops::checker::check_all(
+            let check_result = remind_lib::ops::checker::check_all(
                 &scan_result.reminders,
                 client.as_ref(),
                 8,
@@ -290,15 +290,15 @@ fn run() -> Result<ExitCode, FatalError> {
             if !quiet {
                 match format {
                     OutputFormat::Text => {
-                        remind_me_to_lib::output::text::format_text(
+                        remind_lib::output::text::format_text(
                             &check_result, verbose,
                         );
                     }
                     OutputFormat::Json => {
-                        remind_me_to_lib::output::json::format_json(&check_result);
+                        remind_lib::output::json::format_json(&check_result);
                     }
                     OutputFormat::Llm => {
-                        remind_me_to_lib::output::llm::format_llm(&check_result);
+                        remind_lib::output::llm::format_llm(&check_result);
                     }
                 }
             }

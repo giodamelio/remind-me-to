@@ -12,6 +12,14 @@
     pkgs.cargo-nextest
   ];
 
+  outputs.packages.remind-me-to = pkgs.rustPlatform.buildRustPackage {
+    pname = "remind-me-to";
+    version = "0.1.0";
+    src = ./.;
+    cargoLock.lockFile = ./Cargo.lock;
+    nativeCheckInputs = [ pkgs.git ];
+  };
+
   git-hooks.hooks = {
     cargo-check.enable = true;
     rustfmt.enable = true;

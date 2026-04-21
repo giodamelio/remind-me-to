@@ -1,7 +1,9 @@
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use colored::Colorize;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use remind_me_to_lib::errors::FatalError;
@@ -13,8 +15,20 @@ use remind_me_to_lib::ops::types::ForgeClient;
 #[derive(Parser, Debug)]
 #[command(name = "remind-me-to", version, about)]
 struct Cli {
+    /// When to use colors: auto (default, detect tty), always, never.
+    /// Respects NO_COLOR env var.
+    #[arg(long, global = true, default_value = "auto")]
+    color: ColorMode,
+
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+enum ColorMode {
+    Auto,
+    Always,
+    Never,
 }
 
 #[derive(Subcommand, Debug)]
@@ -62,7 +76,32 @@ enum OutputFormat {
     Llm,
 }
 
-fn init_tracing(verbose: bool, quiet: bool, log_level: &Option<String>) {
+/// Configure the colored crate based on --color flag.
+/// Returns whether colors are enabled (for tracing's with_ansi).
+fn configure_color(mode: &ColorMode) -> bool {
+    match mode {
+        ColorMode::Always => {
+            colored::control::set_override(true);
+            true
+        }
+        ColorMode::Never => {
+            colored::control::set_override(false);
+            false
+        }
+        ColorMode::Auto => {
+            // Let the colored crate handle NO_COLOR / CLICOLOR / CLICOLOR_FORCE.
+            // We just add tty detection on top: if stderr is not a tty, disable.
+            colored::control::unset_override();
+            let is_tty = std::io::stderr().is_terminal();
+            if !is_tty {
+                colored::control::set_override(false);
+            }
+            is_tty
+        }
+    }
+}
+
+fn init_tracing(verbose: bool, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
     let default_directive = if quiet {
         "error"
     } else if let Some(level) = log_level {
@@ -80,7 +119,7 @@ fn init_tracing(verbose: bool, quiet: bool, log_level: &Option<String>) {
         .compact()
         .with_writer(std::io::stderr)
         .with_target(false)
-        .with_ansi(true)
+        .with_ansi(use_ansi)
         .with_span_events(fmt::format::FmtSpan::CLOSE);
 
     tracing_subscriber::registry()
@@ -99,6 +138,8 @@ fn resolve_github_token() -> Option<String> {
 fn run() -> Result<ExitCode, FatalError> {
     let cli = Cli::parse();
 
+    let use_ansi = configure_color(&cli.color);
+
     match cli.command {
         Commands::Check {
             paths,
@@ -110,9 +151,8 @@ fn run() -> Result<ExitCode, FatalError> {
             quiet,
             log_level,
         } => {
-            init_tracing(verbose, quiet, &log_level);
+            init_tracing(verbose, quiet, &log_level, use_ansi);
 
-            // Convert paths
             let path_refs: Vec<&std::path::Path> =
                 paths.iter().map(|p| p.as_path()).collect();
 
@@ -130,12 +170,11 @@ fn run() -> Result<ExitCode, FatalError> {
             // Report parse errors
             if !quiet {
                 for error in &scan_result.errors {
-                    eprintln!("{error}");
+                    eprintln!("{} {error}", "error:".red().bold());
                 }
             }
 
             if dry_run {
-                // Dry run: just show what we found
                 if !quiet {
                     match format {
                         OutputFormat::Json => {
@@ -150,18 +189,20 @@ fn run() -> Result<ExitCode, FatalError> {
                                 println!("No REMIND-ME-TO comments found.");
                             } else {
                                 println!(
-                                    "Found {} reminder(s) (dry run, no conditions checked):\n",
-                                    scan_result.reminders.len()
+                                    "Found {} (dry run, no conditions checked):\n",
+                                    format!("{} reminder(s)", scan_result.reminders.len())
+                                        .bold()
                                 );
                                 for reminder in &scan_result.reminders {
                                     println!(
-                                        "{}:{}: {}",
-                                        reminder.file.display(),
-                                        reminder.line,
+                                        "{}{}{} {}",
+                                        reminder.file.display().to_string().cyan(),
+                                        ":".dimmed(),
+                                        reminder.line.to_string().yellow(),
                                         reminder.description
                                     );
                                     for op in &reminder.operations {
-                                        println!("  {op}");
+                                        println!("  {}", format!("{op}").dimmed());
                                     }
                                     println!();
                                 }
@@ -185,10 +226,9 @@ fn run() -> Result<ExitCode, FatalError> {
             let check_result = remind_me_to_lib::ops::checker::check_all(
                 &scan_result.reminders,
                 client.as_ref(),
-                8, // max concurrent threads
+                8,
             );
 
-            // Format and output
             if !quiet {
                 match format {
                     OutputFormat::Text => {
@@ -205,7 +245,6 @@ fn run() -> Result<ExitCode, FatalError> {
                 }
             }
 
-            // Determine exit code
             let has_triggered = check_result
                 .reminders
                 .iter()
@@ -228,7 +267,7 @@ fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{} {e}", "error:".red().bold());
             ExitCode::from(2)
         }
     }

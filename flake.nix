@@ -67,6 +67,7 @@
         packages = [
           pkgs.cargo-insta
           pkgs.cargo-nextest
+          pkgs.goreleaser
           pkgs.prek
         ];
       };

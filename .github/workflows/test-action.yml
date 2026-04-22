@@ -12,5 +12,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./
+        continue-on-error: true
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

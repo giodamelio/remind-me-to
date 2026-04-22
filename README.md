@@ -17,7 +17,7 @@
 Add `remind-me-to` to your CI pipeline to automatically check if any reminders have been triggered:
 
 ```yaml
-- uses: giodamelio/remind-me-to@v0.1.0
+- uses: giodamelio/remind-me-to@v0.1.1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```

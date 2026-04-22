@@ -25,7 +25,8 @@ jobs:
       - name: List hooks
         id: list-hooks
         run: |
-          hooks=$(nix develop -c prek list --output-format=json | jq -c '[.[].full_id]')
+          nix develop -c sh -c 'prek list --output-format=json > /tmp/hooks.json'
+          hooks=$(jq -c '[.[].full_id]' /tmp/hooks.json)
           echo "hooks=$hooks" >> "$GITHUB_OUTPUT"
 
   run-hooks:

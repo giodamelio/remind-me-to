@@ -109,12 +109,25 @@ impl GitHubClient {
             && let Ok(n) = remaining_str.parse::<u64>()
         {
             if n == 0 {
-                let reset = response
+                let reset_msg = response
                     .headers()
                     .get("X-RateLimit-Reset")
                     .and_then(|v| v.to_str().ok())
-                    .unwrap_or("unknown");
-                tracing::warn!("GitHub rate limit exhausted, resets at {}", reset);
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .map(|reset_epoch| {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        if reset_epoch > now {
+                            let dur = std::time::Duration::from_secs(reset_epoch - now);
+                            format!("resets in {}", humantime::format_duration(dur))
+                        } else {
+                            "resets momentarily".to_string()
+                        }
+                    })
+                    .unwrap_or_else(|| "reset time unknown".to_string());
+                tracing::warn!("GitHub rate limit exhausted, {}", reset_msg);
             } else if n < 10 {
                 tracing::debug!("GitHub rate limit remaining: {}", n);
             }

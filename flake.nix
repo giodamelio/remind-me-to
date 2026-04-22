@@ -49,7 +49,11 @@
         hooks = {
           cargo-check.enable = true;
           rustfmt.enable = true;
-          clippy.enable = true;
+          clippy = {
+            enable = true;
+            entry = "cargo clippy -- -D warnings";
+            pass_filenames = false;
+          };
           cargo-nextest = {
             enable = true;
             name = "cargo-nextest";

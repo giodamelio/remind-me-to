@@ -1,0 +1,112 @@
+name: 'remind-me-to'
+description: 'Scan for REMIND-ME-TO comments and check if conditions are met'
+
+inputs:
+  paths:
+    description: 'Paths to scan (space-separated)'
+    required: false
+    default: '.'
+  github-token:
+    description: 'GitHub token for API requests and downloading the binary'
+    required: false
+    default: ''
+  format:
+    description: 'Output format: text, json, llm'
+    required: false
+    default: 'text'
+  dry-run:
+    description: 'Parse comments without checking external services'
+    required: false
+    default: 'false'
+  ignore:
+    description: 'Additional ignore patterns (newline-separated)'
+    required: false
+    default: ''
+  extra-args:
+    description: 'Additional CLI arguments'
+    required: false
+    default: ''
+  version:
+    description: 'Version to use (default: latest release)'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64)  ARCH="amd64" ;;
+          aarch64) ARCH="arm64" ;;
+        esac
+        echo "os=$OS" >> "$GITHUB_OUTPUT"
+        echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
+
+    - name: Download binary
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        OS="${{ steps.platform.outputs.os }}"
+        ARCH="${{ steps.platform.outputs.arch }}"
+        REPO="giodamelio/remind-me-to"
+        DEST="${{ runner.temp }}/remind-me-to"
+        mkdir -p "$DEST"
+
+        AUTH_HEADER=""
+        if [ -n "${{ inputs.github-token }}" ]; then
+          AUTH_HEADER="Authorization: Bearer ${{ inputs.github-token }}"
+        fi
+
+        # Get the release info
+        if [ "$VERSION" = "latest" ]; then
+          API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+        else
+          API_URL="https://api.github.com/repos/${REPO}/releases/tags/${VERSION}"
+        fi
+
+        RELEASE_JSON=$(curl -fsSL ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$API_URL")
+
+        # Find the matching asset URL
+        ASSET_NAME="remind-me-to-.*-${OS}-${ARCH}\\.tar\\.gz"
+        DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -oP "\"browser_download_url\":\\s*\"\\K[^\"]*${ASSET_NAME}")
+
+        if [ -z "$DOWNLOAD_URL" ]; then
+          echo "::error::No binary found for ${OS}-${ARCH}"
+          exit 1
+        fi
+
+        # Download and extract
+        curl -fsSL ${AUTH_HEADER:+-H "$AUTH_HEADER"} -o "$DEST/archive.tar.gz" "$DOWNLOAD_URL"
+        tar xzf "$DEST/archive.tar.gz" -C "$DEST"
+        chmod +x "$DEST/remind-me-to"
+        echo "$DEST" >> "$GITHUB_PATH"
+
+    - name: Run remind-me-to
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        ARGS="check"
+        ARGS="$ARGS --format ${{ inputs.format }}"
+
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          ARGS="$ARGS --dry-run"
+        fi
+
+        if [ -n "${{ inputs.ignore }}" ]; then
+          while IFS= read -r pattern; do
+            [ -n "$pattern" ] && ARGS="$ARGS --ignore $pattern"
+          done <<< "${{ inputs.ignore }}"
+        fi
+
+        if [ -n "${{ inputs.extra-args }}" ]; then
+          ARGS="$ARGS ${{ inputs.extra-args }}"
+        fi
+
+        ARGS="$ARGS ${{ inputs.paths }}"
+        remind-me-to $ARGS

@@ -69,6 +69,7 @@
         shellHook = hooks.shellHook;
         buildInputs = hooks.enabledPackages;
         packages = [
+          pkgs.act
           pkgs.cargo-insta
           pkgs.cargo-nextest
           pkgs.goreleaser

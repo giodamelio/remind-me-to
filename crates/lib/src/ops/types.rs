@@ -240,8 +240,6 @@ pub trait ForgeClient: Send + Sync {
 
 /// Trait for querying nixpkgs package versions — injectable for testing
 pub trait NixpkgsBackend: Send + Sync {
-    fn get_package_versions(
-        &self,
-        package: &str,
-    ) -> Result<Vec<String>, crate::errors::CheckError>;
+    fn get_package_versions(&self, package: &str)
+    -> Result<Vec<String>, crate::errors::CheckError>;
 }

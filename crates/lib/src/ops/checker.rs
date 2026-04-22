@@ -142,9 +142,7 @@ fn check_one(
         Operation::IssueClosed(issue_ref) => check_issue_closed(issue_ref, client),
         Operation::BranchDeleted(ref_ref) => check_branch_deleted(ref_ref, client),
         Operation::DatePassed(date) => check_date_passed(date),
-        Operation::NixpkgVersion(nixpkg_ref) => {
-            check_nixpkg_version(nixpkg_ref, nixpkgs_client)
-        }
+        Operation::NixpkgVersion(nixpkg_ref) => check_nixpkg_version(nixpkg_ref, nixpkgs_client),
     };
     tracing::debug!(operation = %op, status = ?result.status, "operation result");
     result
@@ -753,10 +751,9 @@ mod tests {
 
         let forge_mock = MockForgeClient::new();
         let mut nix_mock = MockNixpkgsClient::new();
-        nix_mock.version_responses.insert(
-            "redis".into(),
-            Ok(vec!["6.2.6".into(), "6.0.10".into()]),
-        );
+        nix_mock
+            .version_responses
+            .insert("redis".into(), Ok(vec!["6.2.6".into(), "6.0.10".into()]));
 
         let reminders = vec![make_reminder(vec![Operation::NixpkgVersion(NixpkgRef {
             package: "redis".into(),

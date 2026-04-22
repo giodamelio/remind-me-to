@@ -1,0 +1,31 @@
+Comment Examples:
+  Add REMIND-ME-TO comments to your source files. The tool scans for these
+  and checks whether their conditions have been met.
+
+  Basic syntax:
+    // REMIND-ME-TO: <description> [when <condition>]
+
+  Any comment style works (// , # , /* */ , -- , etc.).
+
+  GitHub operations:
+    // REMIND-ME-TO: remove workaround when owner/repo#123 is merged
+    // REMIND-ME-TO: clean up shim when owner/repo#45 is closed
+    // REMIND-ME-TO: bump dependency when owner/repo >= 2.0.0 is tagged
+    // REMIND-ME-TO: drop polyfill when owner/repo#78 is released
+    // REMIND-ME-TO: delete migration when owner/repo@abc1234 is released
+    // REMIND-ME-TO: remove feature flag when owner/repo/old-branch is deleted
+
+  Issues:
+    // REMIND-ME-TO: revisit this when owner/repo#99 is closed
+
+  Date-based:
+    // REMIND-ME-TO: remove beta banner after 2025-06-01
+
+  Nixpkgs:
+    // REMIND-ME-TO: switch to native package when nixpkgs/hello >= 3.0
+
+  Multiple conditions:
+    // REMIND-ME-TO: drop compat layer when owner/repo >= 3.0 is tagged, owner/repo#200 is merged
+
+  Shorthand (inside a repo that has a GitHub remote):
+    // REMIND-ME-TO: remove hack when #42 is merged

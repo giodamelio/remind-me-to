@@ -14,7 +14,7 @@ use remind_lib::ops::types::ForgeClient;
 /// A CLI tool that scans source files for REMIND-ME-TO comments and checks
 /// if their conditions have been met.
 #[derive(Parser, Debug)]
-#[command(name = "remind-me-to", version, about)]
+#[command(name = "remind-me-to", version, about, after_long_help = include_str!("help_examples.txt"))]
 struct Cli {
     /// When to use colors: auto (default, detect tty), always, never.
     /// Respects NO_COLOR env var.

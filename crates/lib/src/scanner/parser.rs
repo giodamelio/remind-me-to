@@ -320,7 +320,9 @@ fn parse_nixpkg_ref(value: &str) -> Result<NixpkgRef, String> {
         return Err(format!("empty package name in '{value}'"));
     }
     if constraint.is_empty() {
-        return Err(format!("expected version constraint after '@' in '{value}'"));
+        return Err(format!(
+            "expected version constraint after '@' in '{value}'"
+        ));
     }
     Ok(NixpkgRef {
         package: package.to_string(),

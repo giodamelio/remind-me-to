@@ -190,11 +190,7 @@ mod tests {
         let mut mock = MockNixpkgsClient::new();
         mock.version_responses.insert(
             "redis".into(),
-            Ok(vec![
-                "7.2.4".into(),
-                "7.0.12".into(),
-                "6.2.6".into(),
-            ]),
+            Ok(vec!["7.2.4".into(), "7.0.12".into(), "6.2.6".into()]),
         );
 
         let versions = mock.get_package_versions("redis").unwrap();

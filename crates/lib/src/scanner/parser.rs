@@ -3,7 +3,7 @@ use std::path::Path;
 use chumsky::prelude::*;
 
 use crate::errors::{ScanError, ScanResult};
-use crate::ops::types::{ForgeRef, IssueRef, Operation, RefRef, Reminder};
+use crate::ops::types::{ForgeRef, IssueRef, NixpkgRef, Operation, RefRef, Reminder};
 
 /// The case-insensitive marker we search for in each line.
 const MARKER: &str = "remind-me-to:";
@@ -184,6 +184,7 @@ fn token_parser<'a>() -> impl Parser<'a, &'a str, Vec<Token>, extra::Err<Rich<'a
         just("issue_closed="),
         just("branch_deleted="),
         just("date_passed="),
+        just("nixpkg_version="),
     ))
     .then(value)
     .map(|(prefix, val): (&str, &str)| {
@@ -249,6 +250,7 @@ fn build_operation(name: &str, value: &str) -> Result<Operation, String> {
         "commit_released" => parse_ref_ref(value).map(Operation::CommitReleased),
         "branch_deleted" => parse_ref_ref(value).map(Operation::BranchDeleted),
         "date_passed" => parse_date(value).map(Operation::DatePassed),
+        "nixpkg_version" => parse_nixpkg_ref(value).map(Operation::NixpkgVersion),
         _ => Err(format!("unknown operation: {name}")),
     }
 }
@@ -307,6 +309,23 @@ fn parse_forge_ref_prefix(value: &str) -> Result<(ForgeRef, &str), String> {
         },
         remaining,
     ))
+}
+
+/// Parse `package@version_constraint` for nixpkg_version operations.
+fn parse_nixpkg_ref(value: &str) -> Result<NixpkgRef, String> {
+    let (package, constraint) = value
+        .split_once('@')
+        .ok_or_else(|| format!("expected 'package@constraint' in '{value}'"))?;
+    if package.is_empty() {
+        return Err(format!("empty package name in '{value}'"));
+    }
+    if constraint.is_empty() {
+        return Err(format!("expected version constraint after '@' in '{value}'"));
+    }
+    Ok(NixpkgRef {
+        package: package.to_string(),
+        version_constraint: constraint.to_string(),
+    })
 }
 
 /// Parse `YYYY-MM-DD` or RFC 3339 datetime.
@@ -741,5 +760,50 @@ fn foo() {}
         );
         insta::assert_debug_snapshot!("mixed_reminders", &result.reminders);
         insta::assert_debug_snapshot!("mixed_errors", &result.errors);
+    }
+
+    // ---- nixpkg_version operation ----
+
+    #[test]
+    fn parse_nixpkg_version() {
+        let r = parse("// REMIND-ME-TO: remove workaround nixpkg_version=redis@>=7.0.0");
+        assert_eq!(r.reminders.len(), 1);
+        match &r.reminders[0].operations[0] {
+            Operation::NixpkgVersion(nixpkg_ref) => {
+                assert_eq!(nixpkg_ref.package, "redis");
+                assert_eq!(nixpkg_ref.version_constraint, ">=7.0.0");
+            }
+            other => panic!("expected NixpkgVersion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_nixpkg_version_with_hyphen_package() {
+        let r = parse("// REMIND-ME-TO: upgrade nixpkg_version=python3-full@>=3.13");
+        match &r.reminders[0].operations[0] {
+            Operation::NixpkgVersion(nixpkg_ref) => {
+                assert_eq!(nixpkg_ref.package, "python3-full");
+                assert_eq!(nixpkg_ref.version_constraint, ">=3.13");
+            }
+            other => panic!("expected NixpkgVersion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_nixpkg_version_missing_at() {
+        let r = parse("// REMIND-ME-TO: fix nixpkg_version=redis");
+        assert_eq!(r.errors.len(), 1);
+    }
+
+    #[test]
+    fn parse_nixpkg_version_empty_package() {
+        let r = parse("// REMIND-ME-TO: fix nixpkg_version=@>=1.0");
+        assert_eq!(r.errors.len(), 1);
+    }
+
+    #[test]
+    fn parse_nixpkg_version_empty_constraint() {
+        let r = parse("// REMIND-ME-TO: fix nixpkg_version=redis@");
+        assert_eq!(r.errors.len(), 1);
     }
 }

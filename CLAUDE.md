@@ -103,6 +103,7 @@ crates/
 | `issue_closed` | Issue is closed |
 | `branch_deleted` | Branch no longer exists |
 | `date_passed` | Specified date has passed |
+| `nixpkg_version` | Package version exists in nixpkgs |
 
 ## Testing Conventions
 

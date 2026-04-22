@@ -8,6 +8,7 @@ use crate::ops::version::check_version_constraint;
 pub fn check_all(
     reminders: &[Reminder],
     client: &dyn ForgeClient,
+    nixpkgs_client: Option<&dyn NixpkgsBackend>,
     max_concurrent: usize,
 ) -> CheckResult {
     tracing::debug!(reminders = reminders.len(), "checking operations");
@@ -38,13 +39,13 @@ pub fn check_all(
             unique_ops
                 .iter()
                 .map(|op| {
-                    let result = check_one(op, client);
+                    let result = check_one(op, client, nixpkgs_client);
                     (op.to_string(), result)
                 })
                 .collect()
         } else {
             // Parallel for larger sets
-            check_parallel(&unique_ops, client, max_concurrent)
+            check_parallel(&unique_ops, client, nixpkgs_client, max_concurrent)
         };
 
     // Map results back to reminders
@@ -96,6 +97,7 @@ pub fn check_all(
 fn check_parallel(
     ops: &[Operation],
     client: &dyn ForgeClient,
+    nixpkgs_client: Option<&dyn NixpkgsBackend>,
     max_concurrent: usize,
 ) -> HashMap<String, OperationResult> {
     std::thread::scope(|s| {
@@ -109,7 +111,7 @@ fn check_parallel(
                     chunk
                         .iter()
                         .map(|op| {
-                            let result = check_one(op, client);
+                            let result = check_one(op, client, nixpkgs_client);
                             (op.to_string(), result)
                         })
                         .collect::<Vec<_>>()
@@ -125,7 +127,11 @@ fn check_parallel(
 }
 
 /// Check a single operation against the forge API.
-fn check_one(op: &Operation, client: &dyn ForgeClient) -> OperationResult {
+fn check_one(
+    op: &Operation,
+    client: &dyn ForgeClient,
+    nixpkgs_client: Option<&dyn NixpkgsBackend>,
+) -> OperationResult {
     tracing::debug!(operation = %op, "checking operation");
     let result = match op {
         Operation::PrMerged(issue_ref) => check_pr_merged(issue_ref, client),
@@ -136,6 +142,9 @@ fn check_one(op: &Operation, client: &dyn ForgeClient) -> OperationResult {
         Operation::IssueClosed(issue_ref) => check_issue_closed(issue_ref, client),
         Operation::BranchDeleted(ref_ref) => check_branch_deleted(ref_ref, client),
         Operation::DatePassed(date) => check_date_passed(date),
+        Operation::NixpkgVersion(nixpkg_ref) => {
+            check_nixpkg_version(nixpkg_ref, nixpkgs_client)
+        }
     };
     tracing::debug!(operation = %op, status = ?result.status, "operation result");
     result
@@ -458,6 +467,43 @@ fn check_date_passed(date: &str) -> OperationResult {
     }
 }
 
+fn check_nixpkg_version(
+    nixpkg_ref: &NixpkgRef,
+    nixpkgs_client: Option<&dyn NixpkgsBackend>,
+) -> OperationResult {
+    let op = Operation::NixpkgVersion(nixpkg_ref.clone());
+    let Some(client) = nixpkgs_client else {
+        return OperationResult {
+            operation: op,
+            status: OperationStatus::Error,
+            detail: Some("nixpkgs checking not configured".to_string()),
+        };
+    };
+
+    match client.get_package_versions(&nixpkg_ref.package) {
+        Ok(versions) => match check_version_constraint(&nixpkg_ref.version_constraint, &versions) {
+            Some(matched_version) => OperationResult {
+                operation: op,
+                status: OperationStatus::Triggered,
+                detail: Some(format!("matched version: {matched_version}")),
+            },
+            None => {
+                let latest = versions.first().map(|v| v.as_str()).unwrap_or("none");
+                OperationResult {
+                    operation: op,
+                    status: OperationStatus::Pending,
+                    detail: Some(format!("latest: {latest}, not yet")),
+                }
+            }
+        },
+        Err(e) => OperationResult {
+            operation: op,
+            status: OperationStatus::Error,
+            detail: Some(e.to_string()),
+        },
+    }
+}
+
 /// Approximate days since Unix epoch for a date.
 fn days_since_epoch(year: i32, month: u32, day: u32) -> u64 {
     // Simple approximation using the same method as mktime
@@ -509,7 +555,7 @@ mod tests {
             number: 1,
         })])];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         assert!(result.reminders[0].triggered);
         assert_eq!(
             result.reminders[0].results[0].status,
@@ -540,7 +586,7 @@ mod tests {
             number: 1,
         })])];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         assert!(!result.reminders[0].triggered);
     }
 
@@ -582,7 +628,7 @@ mod tests {
             }),
         ])];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         assert!(result.reminders[0].triggered);
     }
 
@@ -605,7 +651,7 @@ mod tests {
             make_reminder(vec![op]),
         ];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         // Same operation should only be called once
         assert_eq!(mock.call_count("get_pr_status"), 1);
         assert_eq!(result.reminders.len(), 3);
@@ -653,7 +699,7 @@ mod tests {
             }),
         ])];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         // Should still be triggered because issue_closed succeeded
         assert!(result.reminders[0].triggered);
     }
@@ -671,7 +717,73 @@ mod tests {
             value: "deleted-branch".into(),
         })])];
 
-        let result = check_all(&reminders, &mock, 1);
+        let result = check_all(&reminders, &mock, None, 1);
         assert!(result.reminders[0].triggered);
+    }
+
+    // ---- nixpkg_version tests ----
+
+    #[test]
+    fn nixpkg_version_triggered() {
+        use crate::ops::nixpkgs::mock::MockNixpkgsClient;
+
+        let forge_mock = MockForgeClient::new();
+        let mut nix_mock = MockNixpkgsClient::new();
+        nix_mock.version_responses.insert(
+            "redis".into(),
+            Ok(vec!["7.2.4".into(), "7.0.12".into(), "6.2.6".into()]),
+        );
+
+        let reminders = vec![make_reminder(vec![Operation::NixpkgVersion(NixpkgRef {
+            package: "redis".into(),
+            version_constraint: ">=7.0.0".into(),
+        })])];
+
+        let result = check_all(&reminders, &forge_mock, Some(&nix_mock), 1);
+        assert!(result.reminders[0].triggered);
+        assert_eq!(
+            result.reminders[0].results[0].status,
+            OperationStatus::Triggered
+        );
+    }
+
+    #[test]
+    fn nixpkg_version_pending() {
+        use crate::ops::nixpkgs::mock::MockNixpkgsClient;
+
+        let forge_mock = MockForgeClient::new();
+        let mut nix_mock = MockNixpkgsClient::new();
+        nix_mock.version_responses.insert(
+            "redis".into(),
+            Ok(vec!["6.2.6".into(), "6.0.10".into()]),
+        );
+
+        let reminders = vec![make_reminder(vec![Operation::NixpkgVersion(NixpkgRef {
+            package: "redis".into(),
+            version_constraint: ">=7.0.0".into(),
+        })])];
+
+        let result = check_all(&reminders, &forge_mock, Some(&nix_mock), 1);
+        assert!(!result.reminders[0].triggered);
+        assert_eq!(
+            result.reminders[0].results[0].status,
+            OperationStatus::Pending
+        );
+    }
+
+    #[test]
+    fn nixpkg_version_no_client() {
+        let forge_mock = MockForgeClient::new();
+
+        let reminders = vec![make_reminder(vec![Operation::NixpkgVersion(NixpkgRef {
+            package: "redis".into(),
+            version_constraint: ">=7.0.0".into(),
+        })])];
+
+        let result = check_all(&reminders, &forge_mock, None, 1);
+        assert_eq!(
+            result.reminders[0].results[0].status,
+            OperationStatus::Error
+        );
     }
 }

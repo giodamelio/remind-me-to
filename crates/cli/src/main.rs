@@ -8,6 +8,7 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 use remind_lib::errors::FatalError;
 use remind_lib::ops::github::GitHubClient;
+use remind_lib::ops::nixpkgs::NixpkgsClient;
 use remind_lib::ops::types::ForgeClient;
 
 /// A CLI tool that scans source files for REMIND-ME-TO comments and checks
@@ -291,9 +292,14 @@ fn run() -> Result<ExitCode, FatalError> {
     // Full check mode
     let token = resolve_github_token();
     let client: Box<dyn ForgeClient> = Box::new(GitHubClient::new(token));
+    let nixpkgs_client = NixpkgsClient::new();
 
-    let check_result =
-        remind_lib::ops::checker::check_all(&scan_result.reminders, client.as_ref(), 8);
+    let check_result = remind_lib::ops::checker::check_all(
+        &scan_result.reminders,
+        client.as_ref(),
+        Some(&nixpkgs_client),
+        8,
+    );
 
     if !quiet {
         match format {

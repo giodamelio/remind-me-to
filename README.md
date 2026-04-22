@@ -9,4 +9,5 @@
 // REMIND-ME-TO: Remove workaround issue_closed=github:foo/bar#456
 // REMIND-ME-TO: Delete migration branch_deleted=github:foo/bar@feature-branch
 // REMIND-ME-TO: Review this decision date_passed=2025-06-01
+// REMIND-ME-TO: Remove workaround nixpkg_version=redis@>=8.0.0
 ```

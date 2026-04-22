@@ -42,6 +42,19 @@ impl std::fmt::Display for RefRef {
     }
 }
 
+/// A nixpkgs package reference like `redis@>=7.0.0`
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NixpkgRef {
+    pub package: String,
+    pub version_constraint: String,
+}
+
+impl std::fmt::Display for NixpkgRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.package, self.version_constraint)
+    }
+}
+
 /// A parsed operation from a REMIND-ME-TO comment
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Operation {
@@ -53,6 +66,7 @@ pub enum Operation {
     IssueClosed(IssueRef),
     BranchDeleted(RefRef),
     DatePassed(String),
+    NixpkgVersion(NixpkgRef),
 }
 
 impl Operation {
@@ -67,6 +81,7 @@ impl Operation {
             Operation::IssueClosed(_) => "issue_closed",
             Operation::BranchDeleted(_) => "branch_deleted",
             Operation::DatePassed(_) => "date_passed",
+            Operation::NixpkgVersion(_) => "nixpkg_version",
         }
     }
 }
@@ -82,6 +97,7 @@ impl std::fmt::Display for Operation {
             Operation::IssueClosed(r) => write!(f, "issue_closed={r}"),
             Operation::BranchDeleted(r) => write!(f, "branch_deleted={r}"),
             Operation::DatePassed(d) => write!(f, "date_passed={d}"),
+            Operation::NixpkgVersion(r) => write!(f, "nixpkg_version={r}"),
         }
     }
 }
@@ -220,4 +236,12 @@ pub trait ForgeClient: Send + Sync {
         commit: &str,
         of: &str,
     ) -> Result<AncestorStatus, crate::errors::CheckError>;
+}
+
+/// Trait for querying nixpkgs package versions — injectable for testing
+pub trait NixpkgsBackend: Send + Sync {
+    fn get_package_versions(
+        &self,
+        package: &str,
+    ) -> Result<Vec<String>, crate::errors::CheckError>;
 }

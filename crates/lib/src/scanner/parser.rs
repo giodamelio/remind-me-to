@@ -52,7 +52,7 @@ pub fn parse_file(path: &Path, content: &str) -> ScanResult {
 
             if ops.is_empty() {
                 if !description.is_empty() {
-                    tracing::warn!(
+                    log::warn!(
                         "{}:{}: reminder has no operations: {}",
                         path.display(),
                         line_num,

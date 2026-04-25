@@ -4,7 +4,6 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use remind_lib::errors::FatalError;
 use remind_lib::ops::github::GitHubClient;
@@ -85,7 +84,7 @@ enum OutputFormat {
 }
 
 /// Configure the colored crate based on --color flag.
-/// Returns whether colors are enabled (for tracing's with_ansi).
+/// Returns whether colors are enabled (for log formatting).
 fn configure_color(mode: &ColorMode) -> bool {
     match mode {
         ColorMode::Always => {
@@ -109,61 +108,7 @@ fn configure_color(mode: &ColorMode) -> bool {
     }
 }
 
-/// Custom tracing formatter that omits the level prefix for INFO events
-/// (since info is the default level and the prefix is noise), but shows
-/// the level for everything else.
-struct CustomFormatter {
-    show_targets: bool,
-    use_ansi: bool,
-}
-
-impl<S, N> fmt::FormatEvent<S, N> for CustomFormatter
-where
-    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
-    N: for<'a> fmt::FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &fmt::FmtContext<'_, S, N>,
-        mut writer: fmt::format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        let level = *event.metadata().level();
-
-        // Only print level prefix for non-INFO levels
-        if level != tracing::Level::INFO {
-            if self.use_ansi {
-                use colored::Colorize;
-                let level_str = match level {
-                    tracing::Level::ERROR => "ERROR".red().bold().to_string(),
-                    tracing::Level::WARN => " WARN".yellow().to_string(),
-                    tracing::Level::DEBUG => "DEBUG".blue().to_string(),
-                    tracing::Level::TRACE => "TRACE".purple().to_string(),
-                    _ => level.to_string(),
-                };
-                write!(writer, "{level_str} ")?;
-            } else {
-                write!(writer, "{level:>5} ")?;
-            }
-        }
-
-        if self.show_targets
-            && let Some(target) = event.metadata().module_path()
-        {
-            if self.use_ansi {
-                use colored::Colorize;
-                write!(writer, "{} ", target.dimmed())?;
-            } else {
-                write!(writer, "{target} ")?;
-            }
-        }
-
-        ctx.field_format().format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
-    }
-}
-
-fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
+fn init_logging(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi: bool) {
     let default_directive = if quiet {
         "error"
     } else if let Some(level) = log_level {
@@ -177,28 +122,52 @@ fn init_tracing(verbosity: u8, quiet: bool, log_level: &Option<String>, use_ansi
         }
     };
 
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new(format!(
-            "remind_lib={default_directive},cli={default_directive}"
-        ))
-    });
-
     let show_targets = verbosity >= 3;
 
-    let fmt_layer = fmt::layer()
-        .with_writer(std::io::stderr)
-        .with_ansi(use_ansi)
-        .with_target(show_targets)
-        .with_span_events(fmt::format::FmtSpan::CLOSE)
-        .event_format(CustomFormatter {
-            show_targets,
-            use_ansi,
-        });
+    let mut builder = env_logger::Builder::new();
 
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(fmt_layer)
-        .init();
+    // RUST_LOG takes precedence if set, otherwise use CLI flags
+    if std::env::var("RUST_LOG").is_ok() {
+        builder.parse_default_env();
+    } else {
+        builder.parse_filters(&format!(
+            "remind_lib={default_directive},cli={default_directive}"
+        ));
+    }
+
+    builder.target(env_logger::Target::Stderr);
+    builder.format(move |buf, record| {
+        use std::io::Write;
+        let level = record.level();
+
+        // Only print level prefix for non-INFO levels
+        if level != log::Level::Info {
+            if use_ansi {
+                let level_str = match level {
+                    log::Level::Error => "ERROR".red().bold().to_string(),
+                    log::Level::Warn => " WARN".yellow().to_string(),
+                    log::Level::Debug => "DEBUG".blue().to_string(),
+                    log::Level::Trace => "TRACE".purple().to_string(),
+                    _ => level.to_string(),
+                };
+                write!(buf, "{level_str} ")?;
+            } else {
+                write!(buf, "{level:>5} ")?;
+            }
+        }
+
+        if show_targets && let Some(target) = record.module_path() {
+            if use_ansi {
+                write!(buf, "{} ", target.dimmed())?;
+            } else {
+                write!(buf, "{target} ")?;
+            }
+        }
+
+        writeln!(buf, "{}", record.args())
+    });
+
+    builder.init();
 }
 
 /// Resolve the GitHub token from environment variables.
@@ -227,7 +196,7 @@ fn run() -> Result<ExitCode, FatalError> {
         None => cli.check_args,
     };
 
-    init_tracing(verbose, quiet, &log_level, use_ansi);
+    init_logging(verbose, quiet, &log_level, use_ansi);
 
     let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
 

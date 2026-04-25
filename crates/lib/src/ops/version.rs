@@ -24,7 +24,7 @@ pub fn check_version_constraint(constraint: &str, tags: &[String]) -> Option<Str
         return check_with_manual_comparison(op, ver_str, tags);
     }
 
-    tracing::error!("invalid version constraint '{}'", constraint);
+    log::error!("invalid version constraint '{}'", constraint);
     None
 }
 
@@ -36,18 +36,18 @@ fn check_with_requirement(req: &Requirement, constraint: &str, tags: &[String]) 
         let versioning = match Versioning::new(stripped) {
             Some(v) => v,
             None => {
-                tracing::debug!("skipping tag '{}': not a valid version", tag);
+                log::debug!("skipping tag '{}': not a valid version", tag);
                 continue;
             }
         };
 
         if is_prerelease(&versioning) && !constraint_targets_prerelease(constraint) {
-            tracing::debug!("skipping pre-release tag '{}'", tag);
+            log::debug!("skipping pre-release tag '{}'", tag);
             continue;
         }
 
         if req.matches(&versioning) {
-            tracing::debug!("tag '{}' satisfies constraint '{}'", tag, constraint);
+            log::debug!("tag '{}' satisfies constraint '{}'", tag, constraint);
             return Some(tag.clone());
         }
     }
@@ -102,7 +102,7 @@ fn check_with_manual_comparison(op: &str, ver_str: &str, tags: &[String]) -> Opt
             "=" => tag_ver == constraint_ver,
             // For ^ and ~ with non-semver, fall back to >= behavior with a warning
             "^" | "~" => {
-                tracing::warn!(
+                log::warn!(
                     "constraint '{}{}' uses ^/~ but version doesn't look like semver. \
                      Falling back to >= behavior. Consider using >= instead.",
                     op,
@@ -159,7 +159,7 @@ fn warn_if_non_semver_caret_tilde(constraint: &str, req: &Requirement) {
         && let Some(ref ver) = req.version
         && !matches!(ver, Versioning::Ideal(_))
     {
-        tracing::warn!(
+        log::warn!(
             "constraint '{}' uses ^/~ but version doesn't look like semver. \
                      Consider using >= instead.",
             constraint

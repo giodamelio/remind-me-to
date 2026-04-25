@@ -14,11 +14,11 @@ pub fn walk_paths(
     extra_ignore_patterns: &[String],
 ) -> (Vec<ignore::DirEntry>, Vec<crate::errors::ScanError>) {
     if paths.is_empty() {
-        tracing::debug!("no paths to walk");
+        log::debug!("no paths to walk");
         return (Vec::new(), Vec::new());
     }
 
-    tracing::debug!(roots = paths.len(), "starting parallel file walk");
+    log::debug!("starting parallel file walk roots={}", paths.len());
 
     let mut builder = WalkBuilder::new(paths[0]);
     for path in &paths[1..] {
@@ -40,7 +40,7 @@ pub fn walk_paths(
         for pattern in extra_ignore_patterns {
             // Negate the pattern to make it an ignore (override globs are include by default)
             if let Err(e) = overrides.add(&format!("!{pattern}")) {
-                tracing::warn!("invalid ignore pattern '{}': {}", pattern, e);
+                log::warn!("invalid ignore pattern '{}': {}", pattern, e);
             }
         }
         if let Ok(built) = overrides.build() {
@@ -58,9 +58,9 @@ pub fn walk_paths(
             Ok(entry) => {
                 if entry.file_type().is_some_and(|ft| ft.is_file()) {
                     if is_binary(entry.path()) {
-                        tracing::trace!(file = %entry.path().display(), "skipping binary file");
+                        log::trace!("skipping binary file file={}", entry.path().display());
                     } else {
-                        tracing::trace!(file = %entry.path().display(), "found file");
+                        log::trace!("found file file={}", entry.path().display());
                         let _ = tx.send(entry);
                     }
                 }
@@ -82,10 +82,10 @@ pub fn walk_paths(
     let entries: Vec<_> = rx.into_iter().collect();
     let errors: Vec<_> = err_rx.into_iter().collect();
 
-    tracing::debug!(
-        files = entries.len(),
-        errors = errors.len(),
-        "walk finished"
+    log::debug!(
+        "walk finished files={} errors={}",
+        entries.len(),
+        errors.len()
     );
 
     (entries, errors)

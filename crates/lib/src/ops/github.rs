@@ -65,7 +65,7 @@ impl GitHubClient {
             Err(CheckError::RateLimited { forge, reset_at }) => {
                 if let Ok(secs) = reset_at.parse::<u64>() {
                     let wait = secs.min(30);
-                    tracing::info!("rate limited, waiting {}s before retry", wait);
+                    log::info!("rate limited, waiting {}s before retry", wait);
                     std::thread::sleep(std::time::Duration::from_secs(wait));
                 }
                 self.get(path)
@@ -128,9 +128,9 @@ impl GitHubClient {
                         }
                     })
                     .unwrap_or_else(|| "reset time unknown".to_string());
-                tracing::warn!("GitHub rate limit exhausted, {}", reset_msg);
+                log::warn!("GitHub rate limit exhausted, {}", reset_msg);
             } else if n < 10 {
-                tracing::debug!("GitHub rate limit remaining: {}", n);
+                log::debug!("GitHub rate limit remaining: {}", n);
             }
         }
     }

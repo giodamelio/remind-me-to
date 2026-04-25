@@ -11,7 +11,7 @@ pub fn check_all(
     nixpkgs_client: Option<&dyn NixpkgsBackend>,
     max_concurrent: usize,
 ) -> CheckResult {
-    tracing::debug!(reminders = reminders.len(), "checking operations");
+    log::debug!("checking operations reminders={}", reminders.len());
 
     // Deduplicate operations across all reminders
     let mut unique_ops: Vec<Operation> = Vec::new();
@@ -26,10 +26,10 @@ pub fn check_all(
         }
     }
 
-    tracing::debug!(
-        total_operations = unique_ops.len(),
-        deduplicated_from = reminders.iter().map(|r| r.operations.len()).sum::<usize>(),
-        "deduplicated operations"
+    log::debug!(
+        "deduplicated operations total_operations={} deduplicated_from={}",
+        unique_ops.len(),
+        reminders.iter().map(|r| r.operations.len()).sum::<usize>(),
     );
 
     // Check all unique operations (in parallel if there are enough)
@@ -132,7 +132,7 @@ fn check_one(
     client: &dyn ForgeClient,
     nixpkgs_client: Option<&dyn NixpkgsBackend>,
 ) -> OperationResult {
-    tracing::debug!(operation = %op, "checking operation");
+    log::debug!("checking operation operation={}", op);
     let result = match op {
         Operation::PrMerged(issue_ref) => check_pr_merged(issue_ref, client),
         Operation::PrClosed(issue_ref) => check_pr_closed(issue_ref, client),
@@ -144,7 +144,11 @@ fn check_one(
         Operation::DatePassed(date) => check_date_passed(date),
         Operation::NixpkgVersion(nixpkg_ref) => check_nixpkg_version(nixpkg_ref, nixpkgs_client),
     };
-    tracing::debug!(operation = %op, status = ?result.status, "operation result");
+    log::debug!(
+        "operation result operation={} status={:?}",
+        op,
+        result.status
+    );
     result
 }
 

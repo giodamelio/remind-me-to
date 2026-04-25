@@ -14,39 +14,42 @@ pub fn scan(
     respect_gitignore: bool,
     extra_ignore_patterns: &[String],
 ) -> ScanResult {
-    tracing::debug!(
-        paths = ?paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+    log::debug!(
+        "starting scan paths={:?} respect_gitignore={}",
+        paths
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>(),
         respect_gitignore,
-        "starting scan"
     );
 
     let (entries, mut errors) = walker::walk_paths(paths, respect_gitignore, extra_ignore_patterns);
-    tracing::debug!(
-        files = entries.len(),
-        walk_errors = errors.len(),
-        "file walk complete"
+    log::debug!(
+        "file walk complete files={} walk_errors={}",
+        entries.len(),
+        errors.len()
     );
 
     let mut all_reminders: Vec<Reminder> = Vec::new();
 
     for entry in entries {
         let path = entry.path();
-        tracing::trace!(file = %path.display(), "scanning file");
+        log::trace!("scanning file file={}", path.display());
         match std::fs::read_to_string(path) {
             Ok(content) => {
                 let result = parser::parse_file(path, &content);
                 if !result.reminders.is_empty() {
-                    tracing::debug!(
-                        file = %path.display(),
-                        reminders = result.reminders.len(),
-                        "found reminders"
+                    log::debug!(
+                        "found reminders file={} reminders={}",
+                        path.display(),
+                        result.reminders.len()
                     );
                 }
                 all_reminders.extend(result.reminders);
                 errors.extend(result.errors);
             }
             Err(e) => {
-                tracing::warn!(file = %path.display(), error = %e, "failed to read file");
+                log::warn!("failed to read file file={} error={}", path.display(), e);
                 errors.push(ScanError::FileRead {
                     path: path.to_owned(),
                     source: e,
@@ -58,10 +61,10 @@ pub fn scan(
     // Sort by file path then line number for deterministic output.
     all_reminders.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));
 
-    tracing::debug!(
-        reminders = all_reminders.len(),
-        errors = errors.len(),
-        "scan complete"
+    log::debug!(
+        "scan complete reminders={} errors={}",
+        all_reminders.len(),
+        errors.len()
     );
 
     ScanResult {

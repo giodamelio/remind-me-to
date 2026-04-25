@@ -168,6 +168,7 @@ fn warn_if_non_semver_caret_tilde(constraint: &str, req: &Requirement) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

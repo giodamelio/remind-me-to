@@ -222,7 +222,11 @@ fn run() -> Result<ExitCode, FatalError> {
                         "reminders": scan_result.reminders,
                         "errors": scan_result.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
                     });
-                    println!("{}", serde_json::to_string_pretty(&json).unwrap());
+                    let json_str = serde_json::to_string_pretty(&json).unwrap_or_else(|e| {
+                        eprintln!("error: failed to serialize JSON: {e}");
+                        "{}".to_string()
+                    });
+                    println!("{json_str}");
                 }
                 OutputFormat::Text | OutputFormat::Llm => {
                     if scan_result.reminders.is_empty() {

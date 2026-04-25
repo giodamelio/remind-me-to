@@ -179,6 +179,7 @@ pub fn resolve_shorthand(shorthand: &str, context: &Option<GitContext>) -> Optio
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

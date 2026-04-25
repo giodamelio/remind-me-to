@@ -9,13 +9,16 @@ ignore = "0.4"
 ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
 versions = "6"
 thiserror = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 jiff = { version = "0.2", default-features = false, features = ["std"] }
-log = "0.4"
-colored = "3"
+log = { workspace = true }
+colored = { workspace = true }
 humantime = "2.3.0"
 
 [dev-dependencies]
 insta = { version = "1", features = ["filters"] }
 tempfile = "3"
+
+[lints]
+workspace = true

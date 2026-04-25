@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use ureq::http::Response;
-use serde::Deserialize;
 use ureq::{Agent, Body};
 
 use crate::errors::CheckError;
@@ -371,13 +370,13 @@ pub mod mock {
         }
 
         fn record_call(&self, method: &str) {
-            let counts = self.call_counts.read().unwrap();
+            let counts = self.call_counts.read().expect("lock poisoned");
             if let Some(counter) = counts.get(method) {
                 counter.fetch_add(1, Ordering::Relaxed);
                 return;
             }
             drop(counts);
-            let mut counts = self.call_counts.write().unwrap();
+            let mut counts = self.call_counts.write().expect("lock poisoned");
             counts
                 .entry(method.to_string())
                 .or_insert_with(|| AtomicUsize::new(0))
@@ -385,7 +384,7 @@ pub mod mock {
         }
 
         pub fn call_count(&self, method: &str) -> usize {
-            let counts = self.call_counts.read().unwrap();
+            let counts = self.call_counts.read().expect("lock poisoned");
             counts
                 .get(method)
                 .map(|c| c.load(Ordering::Relaxed))
@@ -475,6 +474,7 @@ pub mod mock {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::mock::MockForgeClient;
     use crate::ops::types::*;

@@ -121,7 +121,7 @@ fn check_parallel(
 
         handles
             .into_iter()
-            .flat_map(|h| h.join().unwrap())
+            .flat_map(|h| h.join().expect("checker thread panicked"))
             .collect()
     })
 }
@@ -475,6 +475,7 @@ fn check_nixpkg_version(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::ops::github::mock::MockForgeClient;

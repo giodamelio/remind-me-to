@@ -11,6 +11,7 @@ versions = "6"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+jiff = { version = "0.2", default-features = false, features = ["std"] }
 log = "0.4"
 colored = "3"
 humantime = "2.3.0"

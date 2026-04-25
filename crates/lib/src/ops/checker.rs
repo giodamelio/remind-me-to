@@ -101,7 +101,7 @@ fn check_parallel(
     max_concurrent: usize,
 ) -> HashMap<String, OperationResult> {
     std::thread::scope(|s| {
-        let chunk_size = (ops.len() / max_concurrent).max(1);
+        let chunk_size = ops.len().div_ceil(max_concurrent);
         let chunks: Vec<_> = ops.chunks(chunk_size).collect();
 
         let handles: Vec<_> = chunks
@@ -408,53 +408,21 @@ fn check_branch_deleted(ref_ref: &RefRef, client: &dyn ForgeClient) -> Operation
 fn check_date_passed(date: &str) -> OperationResult {
     let op = Operation::DatePassed(date.to_string());
 
-    // Parse the date (just the YYYY-MM-DD portion)
     let date_str = &date[..10.min(date.len())];
-    let parts: Vec<&str> = date_str.split('-').collect();
-
-    if parts.len() != 3 {
-        return OperationResult {
-            operation: op,
-            status: OperationStatus::Error,
-            detail: Some(format!("invalid date: {date}")),
-        };
-    }
-
-    let Ok(year) = parts[0].parse::<i32>() else {
-        return OperationResult {
-            operation: op,
-            status: OperationStatus::Error,
-            detail: Some(format!("invalid year in date: {date}")),
-        };
-    };
-    let Ok(month) = parts[1].parse::<u32>() else {
-        return OperationResult {
-            operation: op,
-            status: OperationStatus::Error,
-            detail: Some(format!("invalid month in date: {date}")),
-        };
-    };
-    let Ok(day) = parts[2].parse::<u32>() else {
-        return OperationResult {
-            operation: op,
-            status: OperationStatus::Error,
-            detail: Some(format!("invalid day in date: {date}")),
-        };
+    let target = match date_str.parse::<jiff::civil::Date>() {
+        Ok(d) => d,
+        Err(e) => {
+            return OperationResult {
+                operation: op,
+                status: OperationStatus::Error,
+                detail: Some(format!("invalid date '{date}': {e}")),
+            };
+        }
     };
 
-    // Get current date
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let today = jiff::Zoned::now().date();
 
-    // Convert to days since epoch (approximate)
-    let now_days = now / 86400;
-
-    // Convert target date to days since epoch (approximate)
-    let target_days = days_since_epoch(year, month, day);
-
-    if now_days >= target_days {
+    if today >= target {
         OperationResult {
             operation: op,
             status: OperationStatus::Triggered,
@@ -504,19 +472,6 @@ fn check_nixpkg_version(
             detail: Some(e.to_string()),
         },
     }
-}
-
-/// Approximate days since Unix epoch for a date.
-fn days_since_epoch(year: i32, month: u32, day: u32) -> u64 {
-    // Simple approximation using the same method as mktime
-    let y = if month <= 2 { year - 1 } else { year } as i64;
-    let m = if month <= 2 {
-        month as i64 + 9
-    } else {
-        month as i64 - 3
-    };
-    let days = 365 * y + y / 4 - y / 100 + y / 400 + (m * 306 + 5) / 10 + day as i64 - 719469;
-    days.max(0) as u64
 }
 
 #[cfg(test)]

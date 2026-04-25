@@ -95,6 +95,11 @@ fn scan_line_for_marker(line: &str) -> Option<&str> {
 
 /// Heuristic: does the text before the marker look like it is inside a
 /// comment rather than inside a string literal or regular code?
+///
+/// Known limitations: escaped quotes (`\"`) fool the quote-counting heuristic,
+/// and single-quoted or raw strings are not handled. This is an acceptable
+/// trade-off — false positives produce extra (harmless) reminders, and markers
+/// in non-comment code are caught by the "no comment prefix" path.
 fn looks_like_comment(before: &str) -> bool {
     let trimmed = before.trim();
 
@@ -335,34 +340,19 @@ fn parse_date(value: &str) -> Result<String, String> {
     if value.len() < 10 {
         return Err(format!("expected YYYY-MM-DD, got '{value}'"));
     }
-    let parts: Vec<&str> = value[..10].split('-').collect();
-    if parts.len() != 3 {
-        return Err(format!("expected YYYY-MM-DD, got '{value}'"));
-    }
-    let year: u32 = parts[0]
-        .parse()
-        .map_err(|_| format!("invalid year in '{value}'"))?;
-    let month: u32 = parts[1]
-        .parse()
-        .map_err(|_| format!("invalid month in '{value}'"))?;
-    let day: u32 = parts[2]
-        .parse()
-        .map_err(|_| format!("invalid day in '{value}'"))?;
-    if !(1970..=2100).contains(&year) {
-        return Err(format!("year out of range in '{value}'"));
-    }
-    if !(1..=12).contains(&month) {
-        return Err(format!("month out of range in '{value}'"));
-    }
-    if !(1..=31).contains(&day) {
-        return Err(format!("day out of range in '{value}'"));
-    }
+
+    let date_str = &value[..10];
+    date_str
+        .parse::<jiff::civil::Date>()
+        .map_err(|e| format!("invalid date '{value}': {e}"))?;
+
     if value.len() > 10 {
         let sep = value.as_bytes()[10];
         if sep != b'T' && sep != b't' {
             return Err(format!("expected 'T' after date in '{value}'"));
         }
     }
+
     Ok(value.to_string())
 }
 

@@ -68,8 +68,10 @@ impl GitHubClient {
                     log::info!("rate limited, waiting {}s before retry", wait);
                     std::thread::sleep(std::time::Duration::from_secs(wait));
                 }
-                self.get(path)
-                    .map_err(|_| CheckError::RateLimited { forge, reset_at })
+                self.get(path).map_err(|retry_err| {
+                    log::warn!("retry after rate limit also failed: {}", retry_err);
+                    CheckError::RateLimited { forge, reset_at }
+                })
             }
             Err(e) => Err(e),
         }

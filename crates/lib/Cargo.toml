@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "1.0.0-alpha.8"
+chumsky = { version = "1.0.0-alpha.8", default-features = false, features = ["std"] }
 ignore = "0.4"
-ureq = { version = "3", features = ["json"] }
-http = "1"
+ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
 versions = "6"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

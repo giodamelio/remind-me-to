@@ -1,4 +1,5 @@
-use http::Response;
+use serde::Deserialize;
+use ureq::http::Response;
 use serde::Deserialize;
 use ureq::{Agent, Body};
 
